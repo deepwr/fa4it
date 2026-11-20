@@ -1,0 +1,423 @@
+/* ==========================================================================
+   FA 4 IT — styles.css
+   Toute l'apparence de l'app.
+   Les réglages modifiables (couleurs, arrondis, ombres, tailles) sont
+   regroupés juste en dessous, dans « :root ». Pour changer une couleur
+   partout dans l'app, modifiez-la une seule fois ici.
+   ========================================================================== */
+
+:root {
+  /* --- Couleurs ---------------------------------------------------------- */
+  --bleu: #89CFF0;              /* bleu bébé : boutons principaux, onglet actif */
+  --bleu-presse: #6BBFE6;       /* bleu au moment où l'on appuie sur un bouton */
+  --bleu-clair: #E3F4FC;        /* fond des boutons secondaires */
+  --saumon: #FF91A4;            /* accents et contour des alertes */
+  --saumon-clair: #FFE4E9;      /* fond des alertes */
+  --fond: #F2F2F7;              /* fond de l'app */
+  --carte: #FFFFFF;             /* fond des cartes et des champs */
+  --texte: #2C2C2E;             /* texte principal, y compris sur les boutons */
+  --texte-secondaire: #636366;  /* étiquettes, textes d'aide */
+  --bordure: #D1D1D6;           /* contour des champs */
+  --fond-onglets: rgba(255, 255, 255, 0.92); /* barre du bas, légèrement translucide */
+  --voile: rgba(0, 0, 0, 0.06); /* fines lignes de séparation */
+
+  /* --- Arrondis ---------------------------------------------------------- */
+  --arrondi-carte: 22px;
+  --arrondi-champ: 14px;
+  --arrondi-pilule: 999px;      /* valeur très grande = forme de pilule */
+
+  /* --- Ombres ------------------------------------------------------------ */
+  --ombre-legere: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.06);
+  --ombre-bouton: 0 2px 8px rgba(0, 0, 0, 0.10);
+  --ombre-forte: 0 8px 28px rgba(0, 0, 0, 0.14);
+
+  /* --- Espacements et tailles -------------------------------------------- */
+  --espace-xs: 6px;
+  --espace-s: 8px;
+  --espace-m: 16px;
+  --espace-l: 20px;
+  --espace-xl: 28px;
+  --zone-tactile: 44px;         /* taille minimale d'une zone à toucher (règle Apple) */
+  --hauteur-bouton: 52px;
+  --hauteur-champ: 50px;
+  --hauteur-onglets: 64px;
+
+  /* --- Police ------------------------------------------------------------ */
+  --police: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --taille-texte: 17px;         /* au moins 16 px dans les champs, sinon l'iPhone zoome */
+  --taille-petite: 15px;
+  --taille-sous-titre: 20px;
+  --taille-titre: 32px;
+
+  /* --- Zones protégées de l'écran (Dynamic Island, barre du bas) --------- */
+  --zone-haut: env(safe-area-inset-top, 0px);
+  --zone-bas: env(safe-area-inset-bottom, 0px);
+  --zone-gauche: env(safe-area-inset-left, 0px);
+  --zone-droite: env(safe-area-inset-right, 0px);
+}
+
+/* ==========================================================================
+   Bases
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--police);
+  font-size: var(--taille-texte);
+  line-height: 1.4;
+  color: var(--texte);
+  background: var(--fond);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Bande fixe qui cache le contenu quand il défile sous la Dynamic Island */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--zone-haut);
+  background: var(--fond);
+  z-index: 20;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Contour bien visible quand on se déplace au clavier */
+:focus-visible {
+  outline: 3px solid var(--texte);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   En-tête et zone de contenu
+   ========================================================================== */
+
+.barre-haut {
+  padding:
+    calc(var(--zone-haut) + var(--espace-m))
+    calc(var(--espace-l) + var(--zone-droite))
+    var(--espace-s)
+    calc(var(--espace-l) + var(--zone-gauche));
+}
+
+.barre-haut h1 {
+  font-size: var(--taille-titre);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ecran {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-m);
+  padding:
+    var(--espace-s)
+    calc(var(--espace-l) + var(--zone-droite))
+    calc(var(--hauteur-onglets) + var(--zone-bas) + var(--espace-xl))
+    calc(var(--espace-l) + var(--zone-gauche));
+}
+
+/* Quand il y a des boutons d'action en bas, on laisse plus de place */
+body.avec-actions .ecran {
+  padding-bottom: calc(var(--hauteur-onglets) + var(--zone-bas) + var(--hauteur-bouton) + var(--espace-xl) + var(--espace-m));
+}
+
+/* ==========================================================================
+   Cartes et textes
+   ========================================================================== */
+
+.carte {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-m);
+  padding: var(--espace-l);
+  background: var(--carte);
+  border-radius: var(--arrondi-carte);
+  box-shadow: var(--ombre-legere);
+}
+
+.carte h2 {
+  font-size: var(--taille-sous-titre);
+  font-weight: 600;
+}
+
+.texte-secondaire {
+  color: var(--texte-secondaire);
+  font-size: var(--taille-petite);
+}
+
+.vide {
+  align-items: center;
+  text-align: center;
+  padding: var(--espace-xl) var(--espace-l);
+}
+
+/* ==========================================================================
+   Boutons
+   ========================================================================== */
+
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espace-s);
+  min-height: var(--hauteur-bouton);
+  min-width: var(--zone-tactile);
+  padding: 0 var(--espace-l);
+  border: none;
+  border-radius: var(--arrondi-pilule);
+  background: var(--bleu);
+  color: var(--texte);
+  font-size: var(--taille-texte);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--ombre-bouton);
+  cursor: pointer;
+  touch-action: manipulation;   /* supprime le petit délai du double-tap */
+  -webkit-user-select: none;
+  user-select: none;
+  transition: transform 0.1s ease, background-color 0.1s ease;
+}
+
+.bouton:active {
+  transform: scale(0.97);
+  background: var(--bleu-presse);
+}
+
+.bouton-secondaire {
+  background: var(--bleu-clair);
+  box-shadow: none;
+}
+
+.bouton-secondaire:active {
+  background: var(--bleu);
+}
+
+.bouton-alerte {
+  background: var(--saumon-clair);
+  box-shadow: none;
+}
+
+.bouton-alerte:active {
+  background: var(--saumon);
+}
+
+.bouton-large {
+  width: 100%;
+}
+
+.bouton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ==========================================================================
+   Champs de saisie
+   ========================================================================== */
+
+.groupe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-xs);
+}
+
+.etiquette {
+  font-size: var(--taille-petite);
+  font-weight: 500;
+  color: var(--texte-secondaire);
+}
+
+.champ {
+  width: 100%;
+  min-height: var(--hauteur-champ);
+  padding: 0 var(--espace-m);
+  border: 1.5px solid var(--bordure);
+  border-radius: var(--arrondi-champ);
+  background: var(--carte);
+  font-size: var(--taille-texte);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.champ::placeholder {
+  color: var(--texte-secondaire);
+  opacity: 1;
+}
+
+.champ:focus,
+.champ:focus-visible {
+  outline: none;
+  border-color: var(--texte);
+  box-shadow: 0 0 0 4px var(--bleu);
+}
+
+/* Champ dont la valeur dépasse la limite prévue */
+.champ.en-alerte {
+  border-color: var(--saumon);
+  background: var(--saumon-clair);
+}
+
+/* ==========================================================================
+   Alertes
+   ========================================================================== */
+
+.alerte {
+  padding: var(--espace-m);
+  border: 2px solid var(--saumon);
+  border-radius: var(--arrondi-champ);
+  background: var(--saumon-clair);
+  color: var(--texte);
+  font-size: var(--taille-petite);
+}
+
+/* ==========================================================================
+   Mise en page
+   ========================================================================== */
+
+.rangee {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espace-s);
+}
+
+.pile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-m);
+}
+
+/* ==========================================================================
+   Boutons d'action en bas (au niveau du pouce)
+   ========================================================================== */
+
+.barre-actions {
+  position: fixed;
+  left: calc(var(--espace-l) + var(--zone-gauche));
+  right: calc(var(--espace-l) + var(--zone-droite));
+  bottom: calc(var(--hauteur-onglets) + var(--zone-bas) + var(--espace-m));
+  display: flex;
+  gap: var(--espace-s);
+  z-index: 15;
+}
+
+.barre-actions:empty {
+  display: none;
+}
+
+.barre-actions .bouton {
+  flex: 1;
+  box-shadow: var(--ombre-forte);
+}
+
+/* ==========================================================================
+   Barre d'onglets
+   ========================================================================== */
+
+.barre-onglets {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--espace-xs);
+  height: calc(var(--hauteur-onglets) + var(--zone-bas));
+  padding:
+    var(--espace-s)
+    calc(var(--espace-s) + var(--zone-droite))
+    calc(var(--espace-s) + var(--zone-bas))
+    calc(var(--espace-s) + var(--zone-gauche));
+  background: var(--fond-onglets);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--voile);
+  z-index: 20;
+}
+
+.onglet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--zone-tactile);
+  border-radius: var(--arrondi-pilule);
+  color: var(--texte-secondaire);
+  font-size: var(--taille-petite);
+  font-weight: 600;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.onglet.actif {
+  background: var(--bleu);
+  color: var(--texte);
+}
+
+/* ==========================================================================
+   Message temporaire (en haut de l'écran)
+   ========================================================================== */
+
+.message {
+  position: fixed;
+  top: calc(var(--zone-haut) + var(--espace-s));
+  left: 50%;
+  max-width: calc(100% - 2 * var(--espace-l));
+  padding: var(--espace-s) var(--espace-l);
+  border-radius: var(--arrondi-pilule);
+  background: var(--carte);
+  color: var(--texte);
+  font-size: var(--taille-petite);
+  font-weight: 600;
+  box-shadow: var(--ombre-forte);
+  opacity: 0;
+  transform: translate(-50%, -150%);
+  pointer-events: none;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  z-index: 30;
+}
+
+.message.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* Pour les personnes qui ont désactivé les animations dans iOS */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+}
