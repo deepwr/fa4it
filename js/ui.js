@@ -42,3 +42,53 @@ export function carteVide(titre, explication) {
     </section>
   `;
 }
+
+/**
+ * Carte rose affichée à la place d'un écran quand quelque chose a échoué.
+ */
+export function carteErreur(erreur) {
+  return `
+    <section class="alerte" role="alert">
+      <strong>Un problème est survenu.</strong><br>
+      ${echapper(erreur?.message ?? erreur)}
+    </section>
+  `;
+}
+
+/**
+ * Accorde un mot avec un nombre.
+ * pluriel(1, 'bloc') → « 1 bloc » ; pluriel(3, 'série faite', 'séries faites') → « 3 séries faites ».
+ */
+export function pluriel(nombre, mot, motAuPluriel = `${mot}s`) {
+  return `${nombre} ${Math.abs(nombre) >= 2 ? motAuPluriel : mot}`;
+}
+
+/** Met une majuscule à la première lettre : « accumulation » → « Accumulation ». */
+export function majusculeInitiale(texte) {
+  const propre = String(texte ?? '');
+  return propre.charAt(0).toUpperCase() + propre.slice(1);
+}
+
+/** « 2026-10-26 » → « 26/10/2026 ». */
+export function formaterDate(dateIso) {
+  if (!dateIso) return '—';
+  const [annee, mois, jour] = dateIso.slice(0, 10).split('-');
+  return `${jour}/${mois}/${annee}`;
+}
+
+/** Instant enregistré par l'app → « 21/11/2026 à 00:45 » (heure de l'appareil). */
+export function formaterDateHeure(instantIso) {
+  if (!instantIso) return '—';
+  const instant = new Date(instantIso);
+  const date = instant.toLocaleDateString('fr-FR');
+  const heure = instant.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return `${date} à ${heure}`;
+}
+
+/** 52 345 octets → « 51 Ko ». */
+export function formaterTaille(octets) {
+  if (octets === null || octets === undefined) return 'inconnu';
+  if (octets < 1024) return `${octets} octets`;
+  if (octets < 1024 * 1024) return `${Math.round(octets / 1024)} Ko`;
+  return `${(octets / (1024 * 1024)).toFixed(1).replace('.', ',')} Mo`;
+}

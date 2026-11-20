@@ -1,0 +1,634 @@
+{
+  "app": "FA 4 IT",
+  "format": 1,
+  "exporteLe": "2026-11-21T00:00:00.000Z",
+  "blocs": [
+    {
+      "id": "exemple-bloc",
+      "nom": "Bloc exemple – Accumulation",
+      "objectif": "accumulation",
+      "dateDebut": "2026-10-26",
+      "notes": "Jeu de données d’exemple pour tester l’app. Vous pouvez l’effacer à tout moment (Sauvegarde > Tout effacer).",
+      "semaines": [
+        {
+          "id": "exemple-s1",
+          "numero": 1,
+          "notes": "",
+          "jours": [
+            {
+              "id": "exemple-s1-j1",
+              "nom": "J1 – Squat/Bench",
+              "datePrevue": "2026-10-26",
+              "dateRealisee": "2026-10-26",
+              "exercices": [
+                {
+                  "id": "exemple-s1-j1-e1",
+                  "nom": "Squat",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 4, "repetitions": 5, "rpeCible": 7, "chargeMax": 112.5 },
+                  "series": [
+                    { "charge": 110, "repetitions": 5, "rpe": 7, "vitesse": 0.5, "faite": true },
+                    { "charge": 110, "repetitions": 5, "rpe": 7, "vitesse": 0.49, "faite": true },
+                    { "charge": 110, "repetitions": 5, "rpe": 7, "vitesse": 0.48, "faite": true },
+                    { "charge": 110, "repetitions": 5, "rpe": 8.5, "vitesse": 0.39, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s1-j1-e2",
+                  "nom": "Bench",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 4, "repetitions": 6, "rpeCible": 7, "chargeMax": 62.5 },
+                  "series": [
+                    { "charge": 60, "repetitions": 6, "rpe": 7, "vitesse": 0.45, "faite": true },
+                    { "charge": 60, "repetitions": 6, "rpe": 7, "vitesse": 0.44, "faite": true },
+                    { "charge": 60, "repetitions": 6, "rpe": 7, "vitesse": 0.43, "faite": true },
+                    { "charge": 60, "repetitions": 6, "rpe": 7, "vitesse": 0.42, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s1-j1-e3",
+                  "nom": "Squat pause 2 s",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 3, "repetitions": 4, "rpeCible": 7, "chargeMax": 105 },
+                  "series": [
+                    { "charge": 102.5, "repetitions": 4, "rpe": 7, "vitesse": 0.45, "faite": true },
+                    { "charge": 102.5, "repetitions": 4, "rpe": 7, "vitesse": 0.44, "faite": true },
+                    { "charge": 102.5, "repetitions": 4, "rpe": 7, "vitesse": 0.43, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s1-j1-e4",
+                  "nom": "Rowing barre",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 3, "repetitions": 10, "rpeCible": 8, "chargeMax": null },
+                  "series": [
+                    { "charge": 50, "repetitions": 10, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 50, "repetitions": 10, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 50, "repetitions": 10, "rpe": 8, "vitesse": null, "faite": true }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "exemple-s1-j2",
+              "nom": "J2 – Deadlift/Bench",
+              "datePrevue": "2026-10-28",
+              "dateRealisee": "2026-10-28",
+              "exercices": [
+                {
+                  "id": "exemple-s1-j2-e1",
+                  "nom": "Deadlift",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 3, "repetitions": 4, "rpeCible": 7, "chargeMax": 137.5 },
+                  "series": [
+                    { "charge": 135, "repetitions": 4, "rpe": 7, "vitesse": 0.45, "faite": true },
+                    { "charge": 135, "repetitions": 4, "rpe": 7, "vitesse": 0.44, "faite": true },
+                    { "charge": 135, "repetitions": 4, "rpe": 7, "vitesse": 0.43, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s1-j2-e2",
+                  "nom": "Bench prise serrée",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 7, "chargeMax": 55 },
+                  "series": [
+                    { "charge": 52.5, "repetitions": 8, "rpe": 7, "vitesse": 0.5, "faite": true },
+                    { "charge": 52.5, "repetitions": 8, "rpe": 7, "vitesse": 0.49, "faite": true },
+                    { "charge": 52.5, "repetitions": 8, "rpe": 7, "vitesse": 0.48, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s1-j2-e3",
+                  "nom": "Soulevé de terre roumain",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 7, "chargeMax": 95 },
+                  "series": [
+                    { "charge": 92.5, "repetitions": 8, "rpe": 7, "vitesse": 0.55, "faite": true },
+                    { "charge": 92.5, "repetitions": 8, "rpe": 7, "vitesse": 0.54, "faite": true },
+                    { "charge": 92.5, "repetitions": 8, "rpe": 7, "vitesse": 0.53, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s1-j2-e4",
+                  "nom": "Fentes bulgares (haltères)",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 8, "chargeMax": null },
+                  "series": [
+                    { "charge": 24, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 24, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 24, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "exemple-s1-j3",
+              "nom": "J3 – Bench/Squat",
+              "datePrevue": "2026-10-30",
+              "dateRealisee": "2026-10-30",
+              "exercices": [
+                {
+                  "id": "exemple-s1-j3-e1",
+                  "nom": "Bench",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 5, "repetitions": 3, "rpeCible": 8, "chargeMax": 72.5 },
+                  "series": [
+                    { "charge": 70, "repetitions": 3, "rpe": 8, "vitesse": 0.38, "faite": true },
+                    { "charge": 70, "repetitions": 3, "rpe": 8, "vitesse": 0.37, "faite": true },
+                    { "charge": 70, "repetitions": 3, "rpe": 8, "vitesse": 0.36, "faite": true },
+                    { "charge": 70, "repetitions": 3, "rpe": 8, "vitesse": 0.35, "faite": true },
+                    { "charge": 70, "repetitions": 3, "rpe": 8, "vitesse": 0.34, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s1-j3-e2",
+                  "nom": "Squat",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 3, "repetitions": 3, "rpeCible": 7, "chargeMax": 120 },
+                  "series": [
+                    { "charge": 117.5, "repetitions": 3, "rpe": 7, "vitesse": 0.5, "faite": true },
+                    { "charge": 117.5, "repetitions": 3, "rpe": 7, "vitesse": 0.49, "faite": true },
+                    { "charge": 117.5, "repetitions": 3, "rpe": 7, "vitesse": 0.48, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s1-j3-e3",
+                  "nom": "Deadlift déficit",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 3, "repetitions": 3, "rpeCible": 7, "chargeMax": 127.5 },
+                  "series": [
+                    { "charge": 125, "repetitions": 3, "rpe": 7, "vitesse": null, "faite": true },
+                    { "charge": 125, "repetitions": 3, "rpe": 7, "vitesse": null, "faite": true },
+                    { "charge": 125, "repetitions": 3, "rpe": 7, "vitesse": null, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s1-j3-e4",
+                  "nom": "Développé militaire",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 8, "chargeMax": null },
+                  "series": [
+                    { "charge": 35, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 35, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 35, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "exemple-s2",
+          "numero": 2,
+          "notes": "",
+          "jours": [
+            {
+              "id": "exemple-s2-j1",
+              "nom": "J1 – Squat/Bench",
+              "datePrevue": "2026-11-02",
+              "dateRealisee": "2026-11-02",
+              "exercices": [
+                {
+                  "id": "exemple-s2-j1-e1",
+                  "nom": "Squat",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 4, "repetitions": 5, "rpeCible": 7.5, "chargeMax": 115 },
+                  "series": [
+                    { "charge": 112.5, "repetitions": 5, "rpe": 7.5, "vitesse": 0.46, "faite": true },
+                    { "charge": 112.5, "repetitions": 5, "rpe": 7.5, "vitesse": 0.45, "faite": true },
+                    { "charge": 117.5, "repetitions": 5, "rpe": 8, "vitesse": 0.44, "faite": true },
+                    { "charge": 112.5, "repetitions": 5, "rpe": 7.5, "vitesse": 0.43, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s2-j1-e2",
+                  "nom": "Bench",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 4, "repetitions": 6, "rpeCible": 7.5, "chargeMax": 65 },
+                  "series": [
+                    { "charge": 62.5, "repetitions": 6, "rpe": 7.5, "vitesse": 0.42, "faite": true },
+                    { "charge": 62.5, "repetitions": 6, "rpe": 7.5, "vitesse": 0.41, "faite": true },
+                    { "charge": 62.5, "repetitions": 6, "rpe": 7.5, "vitesse": 0.4, "faite": true },
+                    { "charge": 62.5, "repetitions": 6, "rpe": 7.5, "vitesse": 0.39, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s2-j1-e3",
+                  "nom": "Squat pause 2 s",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 3, "repetitions": 4, "rpeCible": 7.5, "chargeMax": 107.5 },
+                  "series": [
+                    { "charge": 105, "repetitions": 4, "rpe": 7.5, "vitesse": 0.42, "faite": true },
+                    { "charge": 105, "repetitions": 4, "rpe": 7.5, "vitesse": 0.41, "faite": true },
+                    { "charge": 105, "repetitions": 4, "rpe": 7.5, "vitesse": 0.4, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s2-j1-e4",
+                  "nom": "Rowing barre",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 3, "repetitions": 10, "rpeCible": 8, "chargeMax": null },
+                  "series": [
+                    { "charge": 50, "repetitions": 10, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 50, "repetitions": 10, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 50, "repetitions": 10, "rpe": 8, "vitesse": null, "faite": true }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "exemple-s2-j2",
+              "nom": "J2 – Deadlift/Bench",
+              "datePrevue": "2026-11-04",
+              "dateRealisee": "2026-11-04",
+              "exercices": [
+                {
+                  "id": "exemple-s2-j2-e1",
+                  "nom": "Deadlift",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 3, "repetitions": 4, "rpeCible": 7.5, "chargeMax": 140 },
+                  "series": [
+                    { "charge": 137.5, "repetitions": 4, "rpe": 7.5, "vitesse": 0.42, "faite": true },
+                    { "charge": 137.5, "repetitions": 4, "rpe": 7.5, "vitesse": 0.41, "faite": true },
+                    { "charge": 137.5, "repetitions": 4, "rpe": 7.5, "vitesse": 0.4, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s2-j2-e2",
+                  "nom": "Bench prise serrée",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 7.5, "chargeMax": 57.5 },
+                  "series": [
+                    { "charge": 55, "repetitions": 8, "rpe": 7.5, "vitesse": 0.46, "faite": true },
+                    { "charge": 55, "repetitions": 8, "rpe": 7.5, "vitesse": 0.45, "faite": true },
+                    { "charge": 55, "repetitions": 8, "rpe": 7.5, "vitesse": 0.44, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s2-j2-e3",
+                  "nom": "Soulevé de terre roumain",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 7.5, "chargeMax": 97.5 },
+                  "series": [
+                    { "charge": 95, "repetitions": 8, "rpe": 7.5, "vitesse": 0.52, "faite": true },
+                    { "charge": 95, "repetitions": 8, "rpe": 7.5, "vitesse": 0.51, "faite": true },
+                    { "charge": 95, "repetitions": 8, "rpe": null, "vitesse": 0.49, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s2-j2-e4",
+                  "nom": "Fentes bulgares (haltères)",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 8, "chargeMax": null },
+                  "series": [
+                    { "charge": 24, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 24, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 24, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "exemple-s2-j3",
+              "nom": "J3 – Bench/Squat",
+              "datePrevue": "2026-11-06",
+              "dateRealisee": "2026-11-07",
+              "exercices": [
+                {
+                  "id": "exemple-s2-j3-e1",
+                  "nom": "Bench",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 5, "repetitions": 3, "rpeCible": 8.5, "chargeMax": 72.5 },
+                  "series": [
+                    { "charge": 70, "repetitions": 3, "rpe": 8.5, "vitesse": 0.34, "faite": true },
+                    { "charge": 70, "repetitions": 3, "rpe": 8.5, "vitesse": 0.33, "faite": true },
+                    { "charge": 70, "repetitions": 3, "rpe": 8.5, "vitesse": 0.32, "faite": true },
+                    { "charge": 70, "repetitions": 3, "rpe": 8.5, "vitesse": 0.31, "faite": true },
+                    { "charge": null, "repetitions": 3, "rpe": null, "vitesse": null, "faite": false }
+                  ]
+                },
+                {
+                  "id": "exemple-s2-j3-e2",
+                  "nom": "Squat",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 3, "repetitions": 3, "rpeCible": 7.5, "chargeMax": 122.5 },
+                  "series": [
+                    { "charge": 120, "repetitions": 3, "rpe": 7.5, "vitesse": 0.46, "faite": true },
+                    { "charge": 120, "repetitions": 3, "rpe": 7.5, "vitesse": 0.45, "faite": true },
+                    { "charge": 120, "repetitions": 3, "rpe": 7.5, "vitesse": 0.44, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s2-j3-e3",
+                  "nom": "Deadlift déficit",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 3, "repetitions": 3, "rpeCible": 7.5, "chargeMax": 132.5 },
+                  "series": [
+                    { "charge": 130, "repetitions": 3, "rpe": 7.5, "vitesse": 0.36, "faite": true },
+                    { "charge": 130, "repetitions": 3, "rpe": 7.5, "vitesse": 0.35, "faite": true },
+                    { "charge": 130, "repetitions": 3, "rpe": 7.5, "vitesse": 0.34, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s2-j3-e4",
+                  "nom": "Développé militaire",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 8, "chargeMax": null },
+                  "series": [
+                    { "charge": 35, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 35, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 35, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "exemple-s3",
+          "numero": 3,
+          "notes": "",
+          "jours": [
+            {
+              "id": "exemple-s3-j1",
+              "nom": "J1 – Squat/Bench",
+              "datePrevue": "2026-11-09",
+              "dateRealisee": "2026-11-09",
+              "exercices": [
+                {
+                  "id": "exemple-s3-j1-e1",
+                  "nom": "Squat",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 4, "repetitions": 5, "rpeCible": 8, "chargeMax": 120 },
+                  "series": [
+                    { "charge": 117.5, "repetitions": 5, "rpe": 8, "vitesse": 0.43, "faite": true },
+                    { "charge": 117.5, "repetitions": 5, "rpe": 8, "vitesse": 0.42, "faite": true },
+                    { "charge": 117.5, "repetitions": 5, "rpe": 8, "vitesse": 0.41, "faite": true },
+                    { "charge": 117.5, "repetitions": 5, "rpe": 8, "vitesse": 0.4, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s3-j1-e2",
+                  "nom": "Bench",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 4, "repetitions": 6, "rpeCible": 8, "chargeMax": 67.5 },
+                  "series": [
+                    { "charge": 65, "repetitions": 6, "rpe": 8, "vitesse": 0.38, "faite": true },
+                    { "charge": 65, "repetitions": 6, "rpe": 8, "vitesse": 0.37, "faite": true },
+                    { "charge": 65, "repetitions": 6, "rpe": 8, "vitesse": 0.36, "faite": true },
+                    { "charge": 65, "repetitions": 6, "rpe": 8, "vitesse": 0.35, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s3-j1-e3",
+                  "nom": "Squat pause 2 s",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 3, "repetitions": 4, "rpeCible": 8, "chargeMax": 110 },
+                  "series": [
+                    { "charge": 107.5, "repetitions": 4, "rpe": 8, "vitesse": 0.38, "faite": true },
+                    { "charge": 107.5, "repetitions": 4, "rpe": 8, "vitesse": 0.37, "faite": true },
+                    { "charge": 107.5, "repetitions": 4, "rpe": 8, "vitesse": 0.36, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s3-j1-e4",
+                  "nom": "Rowing barre",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 3, "repetitions": 10, "rpeCible": 8, "chargeMax": null },
+                  "series": [
+                    { "charge": 50, "repetitions": 10, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 50, "repetitions": 10, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 50, "repetitions": 10, "rpe": 8, "vitesse": null, "faite": true }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "exemple-s3-j2",
+              "nom": "J2 – Deadlift/Bench",
+              "datePrevue": "2026-11-11",
+              "dateRealisee": "2026-11-11",
+              "exercices": [
+                {
+                  "id": "exemple-s3-j2-e1",
+                  "nom": "Deadlift",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 3, "repetitions": 4, "rpeCible": 8, "chargeMax": 145 },
+                  "series": [
+                    { "charge": 142.5, "repetitions": 4, "rpe": 8, "vitesse": 0.38, "faite": true },
+                    { "charge": 142.5, "repetitions": 4, "rpe": 8, "vitesse": 0.37, "faite": true },
+                    { "charge": 142.5, "repetitions": 4, "rpe": 8, "vitesse": 0.36, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s3-j2-e2",
+                  "nom": "Bench prise serrée",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 8, "chargeMax": 57.5 },
+                  "series": [
+                    { "charge": 55, "repetitions": 8, "rpe": 8, "vitesse": 0.43, "faite": true },
+                    { "charge": 55, "repetitions": 8, "rpe": 8, "vitesse": 0.42, "faite": true },
+                    { "charge": 55, "repetitions": 14, "rpe": 9, "vitesse": 0.25, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s3-j2-e3",
+                  "nom": "Soulevé de terre roumain",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 8, "chargeMax": 100 },
+                  "series": [
+                    { "charge": 97.5, "repetitions": 8, "rpe": 8, "vitesse": 0.48, "faite": true },
+                    { "charge": 97.5, "repetitions": 8, "rpe": 8, "vitesse": 0.47, "faite": true },
+                    { "charge": 97.5, "repetitions": 8, "rpe": 8, "vitesse": 0.46, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s3-j2-e4",
+                  "nom": "Fentes bulgares (haltères)",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 8, "chargeMax": null },
+                  "series": [
+                    { "charge": 24, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 24, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 24, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "exemple-s3-j3",
+              "nom": "J3 – Bench/Squat",
+              "datePrevue": "2026-11-13",
+              "dateRealisee": "2026-11-13",
+              "exercices": [
+                {
+                  "id": "exemple-s3-j3-e1",
+                  "nom": "Bench",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 5, "repetitions": 3, "rpeCible": 9, "chargeMax": 75 },
+                  "series": [
+                    { "charge": 72.5, "repetitions": 3, "rpe": 9, "vitesse": 0.31, "faite": true },
+                    { "charge": 72.5, "repetitions": 3, "rpe": 9, "vitesse": 0.3, "faite": true },
+                    { "charge": 72.5, "repetitions": 3, "rpe": 9, "vitesse": 0.29, "faite": true },
+                    { "charge": 72.5, "repetitions": 3, "rpe": 9, "vitesse": 0.28, "faite": true },
+                    { "charge": 72.5, "repetitions": 3, "rpe": 9.5, "vitesse": 0.23, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s3-j3-e2",
+                  "nom": "Squat",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 3, "repetitions": 3, "rpeCible": 8, "chargeMax": 127.5 },
+                  "series": [
+                    { "charge": 122.5, "repetitions": 3, "rpe": 8, "vitesse": 0.43, "faite": true },
+                    { "charge": 122.5, "repetitions": 3, "rpe": 8, "vitesse": 0.42, "faite": true },
+                    { "charge": 122.5, "repetitions": 3, "rpe": 8, "vitesse": 0.41, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s3-j3-e3",
+                  "nom": "Deadlift déficit",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 3, "repetitions": 3, "rpeCible": 8, "chargeMax": 135 },
+                  "series": [
+                    { "charge": 132.5, "repetitions": 3, "rpe": 8, "vitesse": 0.33, "faite": true },
+                    { "charge": 132.5, "repetitions": 3, "rpe": 8, "vitesse": 0.32, "faite": true },
+                    { "charge": 132.5, "repetitions": 3, "rpe": 8, "vitesse": 0.31, "faite": true }
+                  ]
+                },
+                {
+                  "id": "exemple-s3-j3-e4",
+                  "nom": "Développé militaire",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 3, "repetitions": 8, "rpeCible": 8, "chargeMax": null },
+                  "series": [
+                    { "charge": 35, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 35, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true },
+                    { "charge": 35, "repetitions": 8, "rpe": 8, "vitesse": null, "faite": true }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "exemple-s4",
+          "numero": 4,
+          "notes": "Semaine de décharge : volume et RPE réduits.",
+          "jours": [
+            {
+              "id": "exemple-s4-j1",
+              "nom": "J1 – Squat/Bench",
+              "datePrevue": "2026-11-16",
+              "dateRealisee": null,
+              "exercices": [
+                {
+                  "id": "exemple-s4-j1-e1",
+                  "nom": "Squat",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 3, "repetitions": 3, "rpeCible": 6, "chargeMax": 120 },
+                  "series": []
+                },
+                {
+                  "id": "exemple-s4-j1-e2",
+                  "nom": "Bench",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 3, "repetitions": 4, "rpeCible": 6, "chargeMax": 67.5 },
+                  "series": []
+                },
+                {
+                  "id": "exemple-s4-j1-e3",
+                  "nom": "Squat pause 2 s",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 2, "repetitions": 3, "rpeCible": 6, "chargeMax": 110 },
+                  "series": []
+                },
+                {
+                  "id": "exemple-s4-j1-e4",
+                  "nom": "Rowing barre",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 2, "repetitions": 10, "rpeCible": 7, "chargeMax": null },
+                  "series": []
+                }
+              ]
+            },
+            {
+              "id": "exemple-s4-j2",
+              "nom": "J2 – Deadlift/Bench",
+              "datePrevue": "2026-11-18",
+              "dateRealisee": null,
+              "exercices": [
+                {
+                  "id": "exemple-s4-j2-e1",
+                  "nom": "Deadlift",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 2, "repetitions": 3, "rpeCible": 6, "chargeMax": 142.5 },
+                  "series": []
+                },
+                {
+                  "id": "exemple-s4-j2-e2",
+                  "nom": "Bench prise serrée",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 2, "repetitions": 5, "rpeCible": 6, "chargeMax": 60 },
+                  "series": []
+                },
+                {
+                  "id": "exemple-s4-j2-e3",
+                  "nom": "Soulevé de terre roumain",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 2, "repetitions": 6, "rpeCible": 6, "chargeMax": 102.5 },
+                  "series": []
+                },
+                {
+                  "id": "exemple-s4-j2-e4",
+                  "nom": "Fentes bulgares (haltères)",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 2, "repetitions": 8, "rpeCible": 7, "chargeMax": null },
+                  "series": []
+                }
+              ]
+            },
+            {
+              "id": "exemple-s4-j3",
+              "nom": "J3 – Bench/Squat",
+              "datePrevue": "2026-11-20",
+              "dateRealisee": null,
+              "exercices": [
+                {
+                  "id": "exemple-s4-j3-e1",
+                  "nom": "Bench",
+                  "mouvement": "bench",
+                  "prescription": { "nbSeries": 3, "repetitions": 2, "rpeCible": 7, "chargeMax": 75 },
+                  "series": []
+                },
+                {
+                  "id": "exemple-s4-j3-e2",
+                  "nom": "Squat",
+                  "mouvement": "squat",
+                  "prescription": { "nbSeries": 2, "repetitions": 3, "rpeCible": 6, "chargeMax": 120 },
+                  "series": []
+                },
+                {
+                  "id": "exemple-s4-j3-e3",
+                  "nom": "Deadlift déficit",
+                  "mouvement": "deadlift",
+                  "prescription": { "nbSeries": 2, "repetitions": 3, "rpeCible": 6, "chargeMax": 130 },
+                  "series": []
+                },
+                {
+                  "id": "exemple-s4-j3-e4",
+                  "nom": "Développé militaire",
+                  "mouvement": "autre",
+                  "prescription": { "nbSeries": 2, "repetitions": 8, "rpeCible": 7, "chargeMax": null },
+                  "series": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "creeLe": "2026-10-25T18:00:00.000Z",
+      "modifieLe": "2026-11-21T00:00:00.000Z"
+    }
+  ]
+}
