@@ -1,5 +1,5 @@
 // FA 4 IT — js/ui.js
-// Petites fonctions d'interface réutilisées par tous les écrans.
+// Petites fonctions réutilisées par tous les écrans : affichage, nombres, dates.
 // « export » rend une fonction utilisable depuis un autre fichier.
 
 /**
@@ -68,6 +68,25 @@ export function majusculeInitiale(texte) {
   const propre = String(texte ?? '');
   return propre.charAt(0).toUpperCase() + propre.slice(1);
 }
+
+/* --------------------------------------------------------------------------
+   Nombres
+   -------------------------------------------------------------------------- */
+
+/** 102.5 → « 102,5 » ; une valeur vide donne un texte vide. */
+export function formaterNombre(nombre) {
+  if (nombre === null || nombre === undefined || Number.isNaN(nombre)) return '';
+  return String(nombre).replace('.', ',');
+}
+
+/** Arrondit au 0,5 le plus proche : 7,3 → 7,5 ; 102,2 → 102. */
+export function arrondirAuDemi(nombre) {
+  return Math.round(nombre * 2) / 2;
+}
+
+/* --------------------------------------------------------------------------
+   Dates et tailles
+   -------------------------------------------------------------------------- */
 
 /** « 2026-10-26 » → « 26/10/2026 ». */
 export function formaterDate(dateIso) {

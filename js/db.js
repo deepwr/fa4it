@@ -105,6 +105,45 @@ export async function enregistrerBloc(bloc) {
   return bloc;
 }
 
+/**
+ * Lit un bloc, le modifie et l'enregistre, en une seule opération.
+ * « modification » est une fonction qui reçoit le bloc et le change ;
+ * ce qu'elle renvoie est renvoyé à la fin.
+ * Comme tout se passe dans une seule transaction, deux saisies très
+ * rapprochées passent l'une après l'autre, sans s'écraser.
+ */
+export async function modifierBloc(id, modification) {
+  const base = await ouvrirBase();
+  return new Promise((resoudre, rejeter) => {
+    const transaction = base.transaction('blocs', 'readwrite');
+    const magasin = transaction.objectStore('blocs');
+    let resultat;
+    let probleme = null;
+
+    const lecture = magasin.get(id);
+    lecture.onsuccess = () => {
+      const bloc = lecture.result;
+      if (!bloc) {
+        probleme = new Error('Ce bloc n’existe plus.');
+        transaction.abort();
+        return;
+      }
+      try {
+        resultat = modification(bloc);
+        bloc.modifieLe = new Date().toISOString();
+        magasin.put(bloc);
+      } catch (erreur) {
+        probleme = erreur;
+        transaction.abort();
+      }
+    };
+
+    transaction.oncomplete = () => resoudre(resultat);
+    transaction.onerror = () => rejeter(probleme ?? transaction.error);
+    transaction.onabort = () => rejeter(probleme ?? transaction.error ?? new Error('Enregistrement annulé.'));
+  });
+}
+
 /** Supprime un bloc. */
 export async function supprimerBloc(id) {
   const base = await ouvrirBase();

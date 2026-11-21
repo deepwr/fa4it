@@ -242,6 +242,14 @@ body.avec-actions .ecran {
 .bouton:disabled {
   opacity: 0.5;
   cursor: default;
+  pointer-events: none;
+}
+
+/* Petit bouton (↑, ↓, Supprimer…) : garde une zone tactile de 44 points */
+.bouton-petit {
+  min-height: var(--zone-tactile);
+  padding: 0 var(--espace-m);
+  font-size: var(--taille-petite);
 }
 
 /* ==========================================================================
@@ -284,6 +292,42 @@ body.avec-actions .ecran {
   box-shadow: 0 0 0 4px var(--bleu);
 }
 
+textarea.champ {
+  min-height: calc(var(--hauteur-champ) * 2);
+  padding: var(--espace-s) var(--espace-m);
+  line-height: 1.4;
+  resize: vertical;
+}
+
+/* Dates : texte aligné à gauche comme les autres champs */
+input.champ[type="date"] {
+  display: block;
+  text-align: left;
+}
+
+input.champ[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+/* Listes déroulantes : petite flèche dessinée à droite */
+.choix {
+  position: relative;
+}
+
+.choix::after {
+  content: "▾";
+  position: absolute;
+  top: 50%;
+  right: var(--espace-m);
+  transform: translateY(-50%);
+  color: var(--texte-secondaire);
+  pointer-events: none;
+}
+
+.choix .champ {
+  padding-right: calc(var(--espace-m) * 2.5);
+}
+
 /* Champ dont la valeur dépasse la limite prévue */
 .champ.en-alerte {
   border-color: var(--saumon);
@@ -319,6 +363,82 @@ body.avec-actions .ecran {
   gap: var(--espace-m);
 }
 
+/* Deux colonnes égales (ex. séries / répétitions) */
+.grille-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espace-m) var(--espace-s);
+}
+
+/* Titre placé entre les cartes (ex. « Semaines ») */
+.titre-section {
+  margin-top: var(--espace-s);
+  padding: 0 var(--espace-xs);
+  font-size: var(--taille-sous-titre);
+  font-weight: 700;
+}
+
+/* Espace avant les boutons de suppression */
+.zone-danger {
+  margin-top: var(--espace-m);
+}
+
+/* ==========================================================================
+   Cartes cliquables et fil d'Ariane
+   ========================================================================== */
+
+.carte-lien {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--espace-m);
+  color: inherit;
+  text-decoration: none;
+  touch-action: manipulation;
+  transition: transform 0.1s ease;
+}
+
+.carte-lien:active {
+  transform: scale(0.98);
+}
+
+.carte-lien-texte {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--espace-xs);
+  min-width: 0;
+}
+
+.carte-titre {
+  font-size: var(--taille-sous-titre);
+  font-weight: 600;
+}
+
+.chevron {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--texte-secondaire);
+}
+
+/* Chemin cliquable en haut de l'écran : Programme › Bloc › Semaine */
+.fil {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--espace-s);
+  font-size: var(--taille-petite);
+  color: var(--texte-secondaire);
+}
+
+.fil a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--zone-tactile);
+  color: var(--texte-secondaire);
+  font-weight: 600;
+  text-decoration: none;
+}
+
 /* ==========================================================================
    Boutons d'action en bas (au niveau du pouce)
    ========================================================================== */
@@ -340,6 +460,11 @@ body.avec-actions .ecran {
 .barre-actions .bouton {
   flex: 1;
   box-shadow: var(--ombre-forte);
+}
+
+/* Bouton « ‹ Retour » de la barre du bas : il prend juste la place de son texte */
+.barre-actions .bouton-retour {
+  flex: 0 0 auto;
 }
 
 /* ==========================================================================
