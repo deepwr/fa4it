@@ -12,6 +12,7 @@ import {
   echapper, carteVide, afficherMessage, pluriel, formaterDate,
   formaterNombre, arrondirAuDemi,
 } from './ui.js';
+import { calculerE1rm, seriesDuJour, htmlResultats } from './e1rm.js';
 
 /* ==========================================================================
    1. Règles de saisie
@@ -307,6 +308,7 @@ async function ecranSaisie([idBloc, idSemaine, idJour]) {
         <a class="lien" href="#/jour/${echapper(bloc.id)}/${echapper(semaine.id)}/${echapper(jour.id)}">Modifier la prescription</a>
       </section>
       ${exercices}
+      <section class="carte" id="e1rm-seance">${contenuE1rm(semaine, jour)}</section>
     `,
     actions: `
       <a class="bouton bouton-secondaire bouton-retour" href="#/seance">‹ Séances</a>
@@ -352,6 +354,21 @@ function actualiserLigne(idExercice, index, serie, prescription, source = null) 
   bascule.textContent = serie.faite ? '✓ Faite' : 'À faire';
 }
 
+/** Contenu de la carte « e1RM de la séance ». */
+function contenuE1rm(semaine, jour) {
+  const resultat = calculerE1rm(seriesDuJour(semaine, jour), { nonFaitesEnAttente: true });
+  return `
+    <h2>e1RM de la séance</h2>
+    ${htmlResultats(resultat, { avecJour: false })}
+    <p class="texte-secondaire">Moyenne des séries valides, par mouvement de référence (variantes comprises).</p>
+  `;
+}
+
+function actualiserE1rm(semaine, jour) {
+  const carte = document.getElementById('e1rm-seance');
+  if (carte) carte.innerHTML = contenuE1rm(semaine, jour);
+}
+
 function actualiserProgression(jour) {
   const zone = document.getElementById('progression-seance');
   if (!zone) return;
@@ -369,7 +386,7 @@ async function enregistrerValeur(element, champ, valeur) {
   const index = Number(element.dataset.serie);
 
   const resultat = await modifierBloc(idBloc, (bloc) => {
-    const { jour, exercice } = trouver(bloc, idSemaine, idJour, idExercice);
+    const { semaine, jour, exercice } = trouver(bloc, idSemaine, idJour, idExercice);
     const serie = exercice.series[index];
     if (!serie) throw new Error('Cette série n’existe plus.');
     const ancienne = serie[champ];
@@ -388,15 +405,16 @@ async function enregistrerValeur(element, champ, valeur) {
         }
       }
     }
-    return { jour, exercice, recopiees };
+    return { semaine, jour, exercice, recopiees };
   });
 
-  const { jour, exercice, recopiees } = resultat;
+  const { semaine, jour, exercice, recopiees } = resultat;
   actualiserLigne(idExercice, index, exercice.series[index], exercice.prescription, element);
   for (const i of recopiees) {
     actualiserLigne(idExercice, i, exercice.series[i], exercice.prescription);
   }
   actualiserProgression(jour);
+  actualiserE1rm(semaine, jour);
 }
 
 /** Quand on quitte un champ modifié (charge, répétitions, RPE, vitesse). */
@@ -424,7 +442,7 @@ async function basculerFaite(bouton) {
   const { bloc: idBloc, semaine: idSemaine, jour: idJour, exercice: idExercice } = bouton.dataset;
   const index = Number(bouton.dataset.serie);
 
-  const { jour, exercice } = await modifierBloc(idBloc, (bloc) => {
+  const { semaine, jour, exercice } = await modifierBloc(idBloc, (bloc) => {
     const trouve = trouver(bloc, idSemaine, idJour, idExercice);
     const serie = trouve.exercice.series[index];
     if (!serie) throw new Error('Cette série n’existe plus.');
@@ -437,6 +455,7 @@ async function basculerFaite(bouton) {
   const serie = exercice.series[index];
   actualiserLigne(idExercice, index, serie, exercice.prescription);
   actualiserProgression(jour);
+  actualiserE1rm(semaine, jour);
   if (serie.faite && serie.charge === null) afficherMessage('Série faite — pensez à noter la charge');
 }
 

@@ -4,10 +4,11 @@
 // correspondant, allumer le bon onglet et réagir aux boutons et aux champs.
 
 // « import » récupère des fonctions écrites dans d'autres fichiers (des modules).
-import { carteVide, carteErreur } from './ui.js';
+import { carteErreur } from './ui.js';
 import { demanderStockagePersistant } from './db.js';
 import { ecransProgrammation, boutonsProgrammation, changementsProgrammation } from './programmation.js';
 import { ecransSeance, boutonsSeance, changementsSeance } from './seance.js';
+import { ecransHistorique, changementsHistorique } from './historique.js';
 import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sauvegarde.js';
 
 /* --------------------------------------------------------------------------
@@ -22,14 +23,7 @@ import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sau
 const ecrans = {
   ...ecransProgrammation,   // programme, bloc, semaine, jour (voir programmation.js)
   ...ecransSeance,          // seance (voir seance.js)
-
-  historique: {
-    onglet: 'historique',
-    afficher: async () => ({
-      titre: 'Historique',
-      html: carteVide('Pas encore de données', 'L’e1RM et l’historique arriveront à l’étape 6.'),
-    }),
-  },
+  ...ecransHistorique,      // historique (voir historique.js)
 
   sauvegarde: {
     onglet: 'sauvegarde',
@@ -129,6 +123,7 @@ const actionsBoutons = {
 const actionsChangements = {
   ...changementsProgrammation,
   ...changementsSeance,
+  ...changementsHistorique,
   ...changementsSauvegarde,
 };
 
