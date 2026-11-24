@@ -1,0 +1,89 @@
+/* ==========================================================================
+   FA 4 IT — historique.css
+   Styles de l'e1RM (onglet Historique et carte « e1RM de la séance »).
+   Aucune couleur ni aucun arrondi n'est écrit ici : tout vient des
+   variables définies en haut de styles.css.
+   ========================================================================== */
+
+/* Une ligne de résultat : « Squat ........ 133,2 kg » puis le détail */
+.ligne-e1rm {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px var(--espace-s);
+  padding-bottom: var(--espace-s);
+  border-bottom: 1px solid var(--voile);
+}
+
+.e1rm-nom {
+  font-weight: 600;
+}
+
+.e1rm-valeur {
+  font-size: var(--taille-sous-titre);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.e1rm-detail {
+  grid-column: 1 / -1;
+  color: var(--texte-secondaire);
+  font-size: var(--taille-petite);
+}
+
+/* Listes des séries exclues et des vitesses */
+.liste-exclues,
+.liste-vitesses {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-xs);
+  margin: var(--espace-s) 0 0;
+  padding-left: var(--espace-l);
+}
+
+.liste-vitesses li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Blocs repliables (vitesses, table) */
+.details summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--zone-tactile);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Table RPE : défile horizontalement sur petit écran */
+.tableau-defilant {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: var(--espace-s);
+}
+
+.table-rpe {
+  border-collapse: collapse;
+  font-size: var(--taille-petite);
+  font-variant-numeric: tabular-nums;
+}
+
+.table-rpe th,
+.table-rpe td {
+  padding: var(--espace-xs) var(--espace-s);
+  border-bottom: 1px solid var(--voile);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table-rpe thead th {
+  color: var(--texte-secondaire);
+}
+
+/* La colonne RPE reste visible quand on fait défiler la table */
+.table-rpe tbody th {
+  position: sticky;
+  left: 0;
+  background: var(--carte);
+}
