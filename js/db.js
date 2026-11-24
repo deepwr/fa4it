@@ -4,7 +4,11 @@
 //
 // La base « fa4it » contient deux « magasins » (des sortes de tiroirs) :
 // - blocs    : un enregistrement par bloc, avec tout son contenu ;
-// - reglages : des petites valeurs (ex. date de la dernière sauvegarde).
+// - reglages : des petites valeurs (ex. date de la dernière sauvegarde) et la
+//              copie de secours faite avant chaque import ou effacement.
+//
+// Règle d'or pour les futures versions : ne jamais changer NOM_BASE, et
+// n'augmenter VERSION_BASE qu'avec une migration écrite dans onupgradeneeded.
 
 const NOM_BASE = 'fa4it';
 const VERSION_BASE = 1;   // à augmenter seulement si la structure de la base change
@@ -182,6 +186,77 @@ export async function ecrireReglage(cle, valeur) {
   const transaction = base.transaction('reglages', 'readwrite');
   transaction.objectStore('reglages').put({ cle, valeur });
   await terminer(transaction);
+}
+
+/* --------------------------------------------------------------------------
+   Copie de secours
+   Juste avant une opération qui remplace des données (import du coach, import
+   d'une sauvegarde, exemple, effacement), l'app garde une copie de tous les
+   blocs dans les réglages. Une seule copie : la suivante remplace la précédente.
+   Elle protège d'une fausse manœuvre, pas de la perte de l'iPhone (elle est
+   stockée au même endroit que les données) : l'export reste indispensable.
+   -------------------------------------------------------------------------- */
+
+const CLE_COPIE = 'copieDeSecours';
+
+/** Garde une copie de tous les blocs. « raison » complète la phrase « faite avant … ». */
+export async function garderCopieDeSecours(raison) {
+  const blocs = await lireBlocs();
+  if (blocs.length === 0) return;   // rien à protéger : la copie précédente est conservée
+  await ecrireReglage(CLE_COPIE, { date: new Date().toISOString(), raison, blocs });
+}
+
+/** La copie de secours ({ date, raison, blocs }), ou null s'il n'y en a pas. */
+export function lireCopieDeSecours() {
+  return lireReglage(CLE_COPIE);
+}
+
+export async function supprimerCopieDeSecours() {
+  const base = await ouvrirBase();
+  const transaction = base.transaction('reglages', 'readwrite');
+  transaction.objectStore('reglages').delete(CLE_COPIE);
+  await terminer(transaction);
+}
+
+/**
+ * Remet la copie de secours à la place des données actuelles, en une seule
+ * transaction (tout ou rien). Les données actuelles deviennent la nouvelle copie :
+ * on peut donc revenir en arrière en restaurant à nouveau.
+ */
+export async function restaurerCopieDeSecours(raisonNouvelleCopie) {
+  const base = await ouvrirBase();
+  return new Promise((resoudre, rejeter) => {
+    const transaction = base.transaction(['blocs', 'reglages'], 'readwrite');
+    const magasinBlocs = transaction.objectStore('blocs');
+    const magasinReglages = transaction.objectStore('reglages');
+    let copie = null;
+    let probleme = null;
+
+    const lectureCopie = magasinReglages.get(CLE_COPIE);
+    lectureCopie.onsuccess = () => {
+      copie = lectureCopie.result?.valeur ?? null;
+      if (!copie) {
+        probleme = new Error('Il n’y a pas de copie de secours.');
+        transaction.abort();
+        return;
+      }
+      const lectureActuels = magasinBlocs.getAll();
+      lectureActuels.onsuccess = () => {
+        const actuels = lectureActuels.result;
+        magasinBlocs.clear();
+        for (const bloc of copie.blocs) magasinBlocs.put(bloc);
+        if (actuels.length > 0) {
+          magasinReglages.put({ cle: CLE_COPIE, valeur: { date: new Date().toISOString(), raison: raisonNouvelleCopie, blocs: actuels } });
+        } else {
+          magasinReglages.delete(CLE_COPIE);
+        }
+      };
+    };
+
+    transaction.oncomplete = () => resoudre(copie);
+    transaction.onerror = () => rejeter(probleme ?? transaction.error);
+    transaction.onabort = () => rejeter(probleme ?? transaction.error ?? new Error('Restauration annulée.'));
+  });
 }
 
 /* --------------------------------------------------------------------------

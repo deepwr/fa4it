@@ -19,7 +19,7 @@
 // - les jours déjà commencés ou faits ne sont JAMAIS modifiés ;
 // - avant de toucher aux données, l'app montre ce qui va changer et demande confirmation.
 
-import { lireBlocs, lireBloc, enregistrerBloc, modifierBloc } from './db.js';
+import { lireBlocs, lireBloc, enregistrerBloc, modifierBloc, garderCopieDeSecours } from './db.js';
 import { nouvelId, nouveauBloc, devinerMouvement } from './modele.js';
 import { formaterNombre, pluriel, afficherMessage } from './ui.js';
 
@@ -546,7 +546,8 @@ async function importerCsvCoach(champ) {
     : [`Créer le bloc « ${nomOnglet} » ?`, '', ...details];
   if (!window.confirm(question.join('\n'))) return;
 
-  // 2. Application pour de vrai.
+  // 2. Application pour de vrai, après une copie de secours de toutes les données.
+  await garderCopieDeSecours(`l’import du CSV « ${nomOnglet} »`);
   let bloc;
   if (existant) {
     await modifierBloc(existant.id, (b) => {

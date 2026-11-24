@@ -6,6 +6,7 @@
 //   #/seance                            liste des séances (prochaine, à venir, faites)
 //   #/seance/<bloc>/<semaine>/<jour>    saisie d'une séance
 
+import { carteRappelSauvegarde } from './sauvegarde.js';
 import { lireBlocs, lireBloc, modifierBloc, lireReglage, ecrireReglage } from './db.js';
 import { MOUVEMENTS, lireNombre, nouvelleSerie, aujourdhui } from './modele.js';
 import {
@@ -181,6 +182,7 @@ async function ecranListe() {
   const [prochaine, ...suivantes] = aFaire;
 
   const html = `
+    ${await carteRappelSauvegarde()}
     ${choixBloc}
     ${prochaine
       ? `<h2 class="titre-section">Prochaine séance</h2>${carteSeance(bloc, prochaine, true)}`
