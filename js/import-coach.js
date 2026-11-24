@@ -12,13 +12,16 @@
 // - une ligne sans nom d'exercice continue l'exercice du dessus.
 //
 // Règles de mise à jour (le coach remplit les semaines au fur et à mesure) :
+// - chaque semaine est reconnue par sa date (« SEMAINE 2- 23/11 »), pas par sa place :
+//   une colonne supprimée ou insérée par le coach ne décale rien ;
 // - les semaines et jours nouveaux sont ajoutés ;
 // - les jours pas encore commencés sont remplacés par la version du fichier ;
-// - les jours déjà commencés ou faits ne sont JAMAIS modifiés.
+// - les jours déjà commencés ou faits ne sont JAMAIS modifiés ;
+// - avant de toucher aux données, l'app montre ce qui va changer et demande confirmation.
 
 import { lireBlocs, lireBloc, enregistrerBloc, modifierBloc } from './db.js';
 import { nouvelId, nouveauBloc, devinerMouvement } from './modele.js';
-import { formaterNombre, pluriel } from './ui.js';
+import { formaterNombre, pluriel, afficherMessage } from './ui.js';
 
 // Jours d'entraînement : 1er jour du programme = lundi, 2e = mardi, 3e = jeudi, 4e = samedi.
 // (0 = lundi, 1 = mardi, 2 = mercredi, 3 = jeudi, 4 = vendredi, 5 = samedi, 6 = dimanche)
@@ -316,6 +319,18 @@ export function lireProgrammeCoach(tableau) {
     return { numero: position + 1, titre: joli(titre) || `Semaine ${position + 1}`, lundi, jours: joursUtiles };
   }).filter((semaine) => semaine.jours.length > 0);
 
+  // Deux semaines avec la même date : sans doute un titre recopié sans changer la date.
+  const vues = new Map();
+  for (const semaine of semaines) {
+    if (!semaine.lundi) continue;
+    const cle = dateIso(semaine.lundi);
+    if (vues.has(cle)) {
+      problemes.push(`S${vues.get(cle)} et S${semaine.numero} ont la même date dans le fichier (titres « ${semaines.find((s) => s.numero === vues.get(cle)).titre} » et « ${semaine.titre} ») : vérifiez avec le coach`);
+    } else {
+      vues.set(cle, semaine.numero);
+    }
+  }
+
   return { semaines, problemes };
 }
 
@@ -334,43 +349,119 @@ function jourCommence(jour) {
     exercice.series.some((serie) => serie.faite || serie.charge !== null || serie.rpe !== null || serie.vitesse !== null));
 }
 
-/** Applique le programme importé au bloc. Renvoie un rapport de ce qui a changé. */
-export function fusionner(bloc, programme) {
-  const rapport = { semainesAjoutees: [], joursAjoutes: 0, joursMisAJour: 0, joursConserves: [] };
+/** Vrai si deux jours ont le même programme (noms, dates, prescriptions, consignes), séries réalisées non comprises. */
+function memeContenu(a, b) {
+  const resume = (jour) => JSON.stringify([jour.nom, jour.datePrevue, jour.exercices.map((e) => [
+    e.nom, e.mouvement, e.consignes ?? '',
+    e.prescription.nbSeries, e.prescription.repetitions, e.prescription.rpeCible, e.prescription.chargeMax,
+  ])]);
+  return resume(a) === resume(b);
+}
 
-  for (const importee of programme.semaines) {
-    let semaine = bloc.semaines.find((s) => s.numero === importee.numero);
+/** « 2026-11-19 » → « 2026-11-16 » (le lundi de cette semaine). */
+function lundiDe(dateTexte) {
+  const date = new Date(`${dateTexte}T12:00:00Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+  return dateIso(date);
+}
+
+/**
+ * Lundi d'une semaine de l'app : d'après la date prévue de ses jours, sinon d'après
+ * ses notes si elles finissent par une date de titre du coach (« Semaine 2- 23/11 »).
+ */
+function lundiDeSemaine(semaine) {
+  const dates = semaine.jours.map((jour) => jour.datePrevue).filter(Boolean).sort();
+  if (dates.length > 0) return lundiDe(dates[0]);
+  const notes = String(semaine.notes ?? '');
+  if (/\d{1,2}\s*\/\s*\d{1,2}\s*$/.test(notes)) {
+    const lundi = lundiDepuisTitre(notes);
+    return lundi ? dateIso(lundi) : null;
+  }
+  return null;
+}
+
+/** Vrai si la date figure exactement une fois dans la liste (une date en double n'est pas fiable). */
+function unique(date, dates) {
+  return Boolean(date) && dates.filter((d) => d === date).length === 1;
+}
+
+/**
+ * Applique le programme importé au bloc et renvoie ce qui a changé.
+ *
+ * Chaque semaine du fichier retrouve sa semaine dans l'app :
+ * 1. par sa DATE (le lundi tiré du titre « SEMAINE 2- 23/11 ») : si le coach
+ *    supprime ou insère une colonne, rien ne se décale ;
+ * 2. sinon par sa PLACE (1re, 2e…), sauf si la semaine de l'app à cette place
+ *    correspond clairement à une autre date du fichier. Cela couvre un titre
+ *    corrigé par le coach, ou une date recopiée par erreur d'une semaine à l'autre ;
+ * 3. sinon, c'est une nouvelle semaine.
+ * Dans une semaine, chaque jour retrouve le sien par son numéro (J1, J2…).
+ */
+export function fusionner(bloc, programme) {
+  const lignes = [];
+  const datesFichier = programme.semaines.map((s) => (s.lundi ? dateIso(s.lundi) : null));
+  const dejaPrises = new Set();
+
+  programme.semaines.forEach((importee, index) => {
+    const lundi = datesFichier[index];
+    const libres = bloc.semaines.filter((s) => !dejaPrises.has(s));
+    const datesApp = bloc.semaines.map(lundiDeSemaine);
+    const dateApp = (s) => datesApp[bloc.semaines.indexOf(s)];
+    const fiable = (date) => unique(date, datesFichier) && unique(date, datesApp);
+
+    let semaine = fiable(lundi) ? libres.find((s) => dateApp(s) === lundi) : undefined;
     if (!semaine) {
-      semaine = { id: nouvelId(), numero: importee.numero, notes: importee.titre, jours: [] };
+      const memePlace = libres.find((s) => s.numero === importee.numero);
+      const autreDate = memePlace ? dateApp(memePlace) : null;
+      if (memePlace && !(autreDate && autreDate !== lundi && fiable(autreDate))) semaine = memePlace;
+    }
+
+    const ligne = { semaine, lundi, nouvelle: false, ajoutes: [], misAJour: [], conserves: [] };
+    if (!semaine) {
+      const numeros = bloc.semaines.map((s) => s.numero ?? 0);
+      const numero = numeros.includes(importee.numero) ? Math.max(...numeros) + 1 : importee.numero;
+      semaine = { id: nouvelId(), numero, notes: importee.titre, jours: [] };
       bloc.semaines.push(semaine);
-      rapport.semainesAjoutees.push(importee.numero);
+      ligne.semaine = semaine;
+      ligne.nouvelle = true;
     } else if (!semaine.notes) {
       semaine.notes = importee.titre;
     }
+    dejaPrises.add(semaine);
 
-    // Chaque jour importé retrouve « son » jour dans l'app grâce à son numéro
-    // (J1, J2…), même si le coach remplit les jours dans le désordre.
     for (const jourImporte of importee.jours) {
       const nouveau = { id: nouvelId(), nom: jourImporte.nom, datePrevue: jourImporte.datePrevue, dateRealisee: null, exercices: jourImporte.exercices };
       const position = semaine.jours.findIndex((j) => numeroDeJour(j.nom) === jourImporte.creneau);
       const existant = semaine.jours[position];
+      const court = `J${jourImporte.creneau}`;
       if (!existant) {
         semaine.jours.push(nouveau);
-        rapport.joursAjoutes += 1;
+        ligne.ajoutes.push(court);
+      } else if (memeContenu(existant, nouveau)) {
+        // Rien à changer : le jour reste tel quel (avec ce que vous y avez déjà saisi).
       } else if (jourCommence(existant)) {
-        rapport.joursConserves.push(`S${semaine.numero} · ${existant.nom}`);
+        ligne.conserves.push(court);   // modifié par le coach mais déjà commencé : jamais touché
       } else {
         semaine.jours[position] = { ...nouveau, id: existant.id };
-        rapport.joursMisAJour += 1;
+        ligne.misAJour.push(court);
       }
     }
     // Jours rangés par numéro (J1, J2…) ; ceux sans numéro gardent leur place relative, à la fin.
     semaine.jours.sort((a, b) => (numeroDeJour(a.nom) ?? Infinity) - (numeroDeJour(b.nom) ?? Infinity));
-  }
+    lignes.push(ligne);
+  });
 
+  // Les numéros des semaines existantes ne changent jamais ; une nouvelle semaine prend
+  // sa place dans le fichier (1re, 2e…) si ce numéro est libre, sinon le suivant du bloc.
   bloc.semaines.sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0));
   if (!bloc.dateDebut && programme.semaines[0]?.lundi) bloc.dateDebut = dateIso(programme.semaines[0].lundi);
-  return rapport;
+
+  const changements = lignes.reduce((total, l) => total + (l.nouvelle ? 1 : 0) + l.ajoutes.length + l.misAJour.length, 0);
+  return {
+    changements,
+    lignes: lignes.map((l) => ({ ...l, numero: l.semaine.numero })),
+  };
 }
 
 /**
@@ -388,18 +479,31 @@ function nomOngletDepuisFichier(nomFichier) {
   return (morceaux.length > 1 ? morceaux.slice(1).join(' - ') : sansExtension).trim() || 'Programme du coach';
 }
 
-function texteRapport(nomBloc, cree, rapport, problemes) {
-  const lignes = [cree ? `Bloc « ${nomBloc} » créé.` : `Bloc « ${nomBloc} » mis à jour.`];
-  if (rapport.semainesAjoutees.length > 0) lignes.push(`• ${pluriel(rapport.semainesAjoutees.length, 'semaine ajoutée', 'semaines ajoutées')} (S${rapport.semainesAjoutees.join(', S')})`);
-  if (rapport.joursAjoutes > 0) lignes.push(`• ${pluriel(rapport.joursAjoutes, 'jour ajouté', 'jours ajoutés')}`);
-  if (rapport.joursMisAJour > 0) lignes.push(`• ${pluriel(rapport.joursMisAJour, 'jour mis à jour', 'jours mis à jour')}`);
-  if (rapport.joursConserves.length > 0) lignes.push(`• Déjà commencés, laissés tels quels : ${rapport.joursConserves.join(' ; ')}`);
-  if (problemes.length > 0) {
-    lignes.push('', `⚠︎ ${pluriel(problemes.length, 'ligne à vérifier', 'lignes à vérifier')} :`);
-    lignes.push(...problemes.slice(0, 12).map((p) => `• ${p}`));
-    if (problemes.length > 12) lignes.push(`• … et ${problemes.length - 12} autres`);
+/** Une ligne par semaine concernée, ex. « • S2 (23/11) : mis à jour : J2 · déjà commencé, non modifié : J1 ». */
+function lignesRapport(rapport) {
+  const textes = [];
+  for (const l of rapport.lignes) {
+    const nom = `S${l.numero}${l.lundi ? ` (${l.lundi.slice(8, 10)}/${l.lundi.slice(5, 7)})` : ''}`;
+    if (l.nouvelle) {
+      textes.push(`• ${nom} — nouvelle semaine : ${pluriel(l.ajoutes.length, 'jour')}`);
+      continue;
+    }
+    const morceaux = [];
+    if (l.ajoutes.length > 0) morceaux.push(`${l.ajoutes.length > 1 ? 'ajoutés' : 'ajouté'} : ${l.ajoutes.join(', ')}`);
+    if (l.misAJour.length > 0) morceaux.push(`mis à jour : ${l.misAJour.join(', ')}`);
+    if (l.conserves.length > 0) morceaux.push(`${l.conserves.length > 1 ? 'déjà commencés, non modifiés' : 'déjà commencé, non modifié'} : ${l.conserves.join(', ')}`);
+    if (morceaux.length > 0) textes.push(`• ${nom} : ${morceaux.join(' · ')}`);
   }
-  return lignes.join('\n');
+  return textes;
+}
+
+function lignesProblemes(problemes) {
+  if (problemes.length === 0) return [];
+  return [
+    '', `⚠︎ ${pluriel(problemes.length, 'ligne à vérifier', 'lignes à vérifier')} :`,
+    ...problemes.slice(0, 12).map((p) => `• ${p}`),
+    ...(problemes.length > 12 ? [`• … et ${problemes.length - 12} autres`] : []),
+  ];
 }
 
 /* ==========================================================================
@@ -428,16 +532,24 @@ async function importerCsvCoach(champ) {
   const existant = blocVise
     ? await lireBloc(blocVise)
     : (await lireBlocs()).find((b) => b.source === nomOnglet || b.nom === nomOnglet);
-  const nbSemaines = pluriel(programme.semaines.length, 'semaine');
-  const question = existant
-    ? `Mettre à jour le bloc « ${existant.nom} » avec ce fichier (${nbSemaines}) ?\n\nLes séances déjà commencées ne seront pas modifiées.`
-    : `Créer le bloc « ${nomOnglet} » (${nbSemaines}) à partir de ce fichier ?`;
-  if (!window.confirm(question)) return;
 
+  // 1. Essai à blanc sur une copie : on montre ce qui va changer AVANT de toucher aux données.
+  const apercu = fusionner(existant ? structuredClone(existant) : { semaines: [] }, programme);
+  const details = [...lignesRapport(apercu), ...lignesProblemes(programme.problemes)];
+
+  if (existant && apercu.changements === 0) {
+    window.alert([`Le bloc « ${existant.nom} » est déjà à jour : rien de nouveau dans ce fichier.`, ...(details.length > 0 ? ['', ...details] : [])].join('\n'));
+    return;
+  }
+  const question = existant
+    ? [`Mettre à jour le bloc « ${existant.nom} » ?`, '', ...details, '', 'Les séances déjà commencées ne sont jamais modifiées.']
+    : [`Créer le bloc « ${nomOnglet} » ?`, '', ...details];
+  if (!window.confirm(question.join('\n'))) return;
+
+  // 2. Application pour de vrai.
   let bloc;
-  let rapport;
   if (existant) {
-    rapport = await modifierBloc(existant.id, (b) => {
+    await modifierBloc(existant.id, (b) => {
       if (!b.source) b.source = nomOnglet;
       return fusionner(b, programme);
     });
@@ -448,11 +560,11 @@ async function importerCsvCoach(champ) {
     bloc.objectif = /PEAK/i.test(nomOnglet) ? 'peaking' : 'autre';
     bloc.dateDebut = null;
     bloc.notes = 'Importé du Google Sheets du coach.';
-    rapport = fusionner(bloc, programme);
+    fusionner(bloc, programme);
     await enregistrerBloc(bloc);
   }
 
-  window.alert(texteRapport(existant?.nom ?? nomOnglet, !existant, rapport, programme.problemes));
+  afficherMessage(existant ? 'Bloc mis à jour' : 'Bloc créé');
   const adresse = `#/bloc/${bloc.id}`;
   if (location.hash === adresse) {
     window.dispatchEvent(new CustomEvent('donnees-modifiees', { detail: { cible: null } }));
