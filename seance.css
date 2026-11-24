@@ -33,6 +33,18 @@
   gap: var(--espace-xs);
 }
 
+/* Consignes du coach (repos, fourchettes, indications) : encadré bleu très clair */
+.consignes {
+  padding: var(--espace-s) var(--espace-m);
+  border-left: 4px solid var(--bleu);
+  border-radius: var(--arrondi-champ);
+  background: var(--bleu-clair);
+  color: var(--texte);
+  font-size: var(--taille-petite);
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
 /* --------------------------------------------------------------------------
    Une série
    -------------------------------------------------------------------------- */

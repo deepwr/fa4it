@@ -8,12 +8,16 @@
 //   #/bloc/<bloc>                     un bloc et ses semaines
 //   #/semaine/<bloc>/<semaine>        une semaine et ses jours
 //   #/jour/<bloc>/<semaine>/<jour>    un jour et ses exercices
+//
+// L'import du programme du coach (CSV) est dans import-coach.js ; son bouton
+// est sur l'écran Programme.
 
 import { lireBlocs, lireBloc, enregistrerBloc, modifierBloc, supprimerBloc } from './db.js';
 import {
-  MOUVEMENTS, OBJECTIFS, compter, lireNombre, nouvelId,
+  MOUVEMENTS, OBJECTIFS, compter, lireNombre, nouvelId, devinerMouvement,
   nouveauBloc, nouvelleSemaine, nouveauJour, nouvelExercice,
 } from './modele.js';
+import { boutonsImportCoach, changementsImportCoach } from './import-coach.js';
 import {
   echapper, carteVide, afficherMessage, pluriel, formaterDate,
   formaterNombre, arrondirAuDemi, majusculeInitiale,
@@ -75,15 +79,6 @@ function ajouterJours(dateIso, nombreDeJours) {
   return date.toISOString().slice(0, 10);
 }
 
-/** Propose un mouvement de référence d'après le nom (modifiable ensuite). */
-function devinerMouvement(nom) {
-  const texte = nom.toLowerCase();
-  if (texte.includes('squat')) return 'squat';
-  if (/bench|couché|couche/.test(texte)) return 'bench';
-  if (/deadlift|soulevé|souleve|terre/.test(texte)) return 'deadlift';
-  return 'autre';
-}
-
 /* --- Copies : nouveaux identifiants, séries réalisées vidées, dates décalées --- */
 
 function copierExercice(exercice) {
@@ -91,6 +86,7 @@ function copierExercice(exercice) {
     id: nouvelId(),
     nom: exercice.nom,
     mouvement: exercice.mouvement,
+    consignes: exercice.consignes ?? '',
     prescription: { ...exercice.prescription },   // « ... » recopie chaque valeur
     series: [],
   };
@@ -318,6 +314,7 @@ function carteExercice(idsJour, exercice, position, nombre) {
         ${champ({ ids, nom: 'prescription.rpeCible', etiquette: 'RPE cible', valeur: prescription.rpeCible, format: 'rpe', indice: 'Ex. 7,5' })}
         ${champ({ ids, nom: 'prescription.chargeMax', etiquette: 'Charge max (kg)', valeur: prescription.chargeMax, format: 'charge', indice: 'Ex. 112,25' })}
       </div>
+      ${champ({ ids, nom: 'consignes', etiquette: 'Consignes', valeur: exercice.consignes, format: 'notes', indice: 'Repos, tempo, indications du coach…' })}
       ${faites > 0 ? `<p class="texte-secondaire">${pluriel(faites, 'série réalisée', 'séries réalisées')}</p>` : ''}
       <div class="rangee">
         <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="monter-exercice" ${attributsCible(ids)} aria-label="Monter l’exercice"${position === 0 ? ' disabled' : ''}>↑</button>
@@ -333,14 +330,33 @@ function carteExercice(idsJour, exercice, position, nombre) {
    Chaque écran renvoie { titre, html, actions }.
    ========================================================================== */
 
+/**
+ * Carte « Programme du coach » : import d'un onglet du Google Sheets exporté en CSV.
+ * Sur l'écran Programme : le bloc est retrouvé (ou créé) d'après le nom du fichier.
+ * Sur l'écran d'un bloc importé (bloc fourni) : c'est ce bloc qui est mis à jour.
+ */
+function carteImportCoach(bloc = null) {
+  const texte = bloc
+    ? `Le coach a ajouté ou modifié des semaines dans l’onglet « ${echapper(bloc.source)} » ? Importez à nouveau son CSV : ce bloc est mis à jour, les séances déjà commencées ne sont jamais modifiées.`
+    : 'Exportez l’onglet du bloc depuis le Google Sheets du coach au format CSV, puis importez le fichier ici. Réimportez-le chaque fois que le coach ajoute une semaine : les séances déjà commencées ne sont jamais modifiées.';
+  return `
+    <section class="carte">
+      <h2>Programme du coach</h2>
+      <p class="texte-secondaire">${texte}</p>
+      <button class="bouton bouton-secondaire bouton-large" type="button" data-action="choisir-csv-coach"${bloc ? ` data-bloc="${echapper(bloc.id)}"` : ''}>${bloc ? 'Mettre à jour avec un CSV…' : 'Importer un CSV…'}</button>
+      <input id="fichier-coach" type="file" accept=".csv,text/csv,text/comma-separated-values,text/plain" data-changement="importer-csv-coach" hidden>
+    </section>
+  `;
+}
+
 async function ecranProgramme() {
   const blocs = await lireBlocs();
-  const html = blocs.length > 0
+  const liste = blocs.length > 0
     ? blocs.map(carteBloc).join('')
-    : carteVide('Aucun bloc pour l’instant', 'Créez votre premier bloc avec le bouton ci-dessous, ou chargez l’exemple depuis l’onglet Sauvegarde.');
+    : carteVide('Aucun bloc pour l’instant', 'Importez le programme du coach, créez un bloc avec le bouton ci-dessous, ou chargez l’exemple depuis l’onglet Sauvegarde.');
   return {
     titre: 'Programme',
-    html,
+    html: liste + carteImportCoach(),
     actions: '<button class="bouton" type="button" data-action="nouveau-bloc">+ Nouveau bloc</button>',
   };
 }
@@ -367,6 +383,8 @@ async function ecranBloc([idBloc]) {
 
       <h2 class="titre-section">Semaines</h2>
       ${semaines}
+
+      ${bloc.source ? carteImportCoach(bloc) : ''}
 
       <div class="zone-danger">
         <button class="bouton bouton-alerte bouton-large" type="button" data-action="supprimer-bloc" ${attributsCible(ids)}>Supprimer ce bloc</button>
@@ -651,8 +669,10 @@ export const boutonsProgrammation = {
   'monter-exercice': (bouton) => deplacerExercice(bouton, -1),
   'descendre-exercice': (bouton) => deplacerExercice(bouton, +1),
   'supprimer-exercice': supprimerLExercice,
+  ...boutonsImportCoach,   // « Importer un CSV… »
 };
 
 export const changementsProgrammation = {
   'modifier': modifierChamp,
+  ...changementsImportCoach,   // fichier CSV choisi
 };

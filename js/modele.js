@@ -3,12 +3,14 @@
 //
 // Bloc
 //  ├─ nom, objectif, dateDebut (AAAA-MM-JJ), notes
+//  ├─ source : nom de l'onglet du coach s'il a été importé d'un CSV (sinon vide)
 //  └─ semaines : [ Semaine ]
 //       ├─ numero, notes
 //       └─ jours : [ Jour ]
 //            ├─ nom, datePrevue, dateRealisee
 //            └─ exercices : [ Exercice ]   (l'ordre de la liste = l'ordre dans la séance)
 //                 ├─ nom, mouvement (squat, bench, deadlift ou autre)
+//                 ├─ consignes : texte libre (repos, fourchettes, indications du coach)
 //                 ├─ prescription : { nbSeries, repetitions, rpeCible, chargeMax }
 //                 └─ series : [ Série réalisée ]   (une ligne par série)
 //                      └─ charge, repetitions, rpe, vitesse, faite
@@ -27,6 +29,15 @@ export const MOUVEMENTS = {
 };
 
 export const OBJECTIFS = ['accumulation', 'intensification', 'peaking', 'décharge', 'autre'];
+
+/** Propose un mouvement de référence d'après le nom (modifiable ensuite). */
+export function devinerMouvement(nom) {
+  const texte = String(nom ?? '').toLowerCase();
+  if (texte.includes('squat')) return 'squat';
+  if (/bench|couché|couche/.test(texte)) return 'bench';
+  if (/deadlift|soulevé|souleve|terre/.test(texte)) return 'deadlift';
+  return 'autre';
+}
 
 /* --------------------------------------------------------------------------
    Identifiants et lecture des valeurs
@@ -78,6 +89,7 @@ export function nouveauBloc(nom = 'Nouveau bloc') {
     objectif: 'accumulation',
     dateDebut: aujourdhui(),
     notes: '',
+    source: '',
     semaines: [],
     creeLe: maintenant,
     modifieLe: maintenant,
@@ -97,6 +109,7 @@ export function nouvelExercice(nom = 'Nouvel exercice', mouvement = 'autre') {
     id: nouvelId(),
     nom,
     mouvement,
+    consignes: '',
     prescription: { nbSeries: 3, repetitions: 5, rpeCible: null, chargeMax: null },
     series: [],
   };
@@ -129,6 +142,7 @@ function normaliserExercice(brut) {
     id: lireTexte(brut?.id) || nouvelId(),
     nom: lireTexte(brut?.nom) || 'Exercice sans nom',
     mouvement: Object.hasOwn(MOUVEMENTS, mouvement) ? mouvement : 'autre',
+    consignes: lireTexte(brut?.consignes),
     prescription: {
       nbSeries: lireNombre(prescription.nbSeries),
       repetitions: lireNombre(prescription.repetitions),
@@ -172,6 +186,7 @@ export function normaliserBloc(brut) {
     objectif: lireTexte(brut.objectif) || 'autre',
     dateDebut: lireDate(brut.dateDebut),
     notes: lireTexte(brut.notes),
+    source: lireTexte(brut.source),
     semaines: brut.semaines.map(normaliserSemaine),
     creeLe: lireTexte(brut.creeLe) || maintenant,
     modifieLe: lireTexte(brut.modifieLe) || maintenant,

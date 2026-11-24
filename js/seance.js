@@ -266,6 +266,7 @@ function carteExerciceSeance(idsJour, exercice) {
       <div class="entete-exercice">
         <h2>${echapper(exercice.nom)}</h2>
         <p class="texte-secondaire">${MOUVEMENTS[exercice.mouvement] ?? 'Autre'} · ${resumePrescription(exercice.prescription)}</p>
+        ${exercice.consignes ? `<p class="consignes">${echapper(exercice.consignes)}</p>` : ''}
       </div>
       ${lignes || '<p class="texte-secondaire">Aucune série prévue.</p>'}
       <div class="rangee">
