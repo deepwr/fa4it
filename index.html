@@ -9,6 +9,10 @@
   <meta name="apple-mobile-web-app-title" content="FA 4 IT">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>FA 4 IT</title>
+  <!-- PWA : fiche d'identité de l'app, icône de l'écran d'accueil, icône d'onglet -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icons/favicon.png">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="seance.css">
   <link rel="stylesheet" href="historique.css">
@@ -38,5 +42,7 @@
 
   <!-- type="module" : permet de découper le code JavaScript en plusieurs fichiers -->
   <script type="module" src="js/app.js"></script>
+  <!-- Mode hors ligne (service worker) -->
+  <script type="module" src="js/pwa.js"></script>
 </body>
 </html>

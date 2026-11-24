@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "FA 4 IT",
+  "short_name": "FA 4 IT",
+  "description": "Carnet d'entraînement de force athlétique : programmation, séances et e1RM.",
+  "lang": "fr",
+  "start_url": "./#/seance",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F2F7",
+  "theme_color": "#F2F2F7",
+  "icons": [
+    { "src": "icons/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}
