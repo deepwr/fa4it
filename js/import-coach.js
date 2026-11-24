@@ -20,7 +20,7 @@
 // - avant de toucher aux données, l'app montre ce qui va changer et demande confirmation.
 
 import { lireBlocs, lireBloc, enregistrerBloc, modifierBloc, garderCopieDeSecours } from './db.js';
-import { nouvelId, nouveauBloc, devinerMouvement } from './modele.js';
+import { nouvelId, nouveauBloc, devinerMouvement, estFormatCompetition } from './modele.js';
 import { formaterNombre, pluriel, afficherMessage } from './ui.js';
 
 // Jours d'entraînement : 1er jour du programme = lundi, 2e = mardi, 3e = jeudi, 4e = samedi.
@@ -292,10 +292,13 @@ export function lireProgrammeCoach(tableau) {
         indications ? `Indications : ${joli(indications)}` : '',
       ].filter(Boolean).join(' · ');
 
+      const nomExercice = variationCourante ? `${joli(exerciceCourant)} – ${joli(variationCourante)}` : joli(exerciceCourant);
+      const mouvement = devinerMouvement(exerciceCourant);
       jour.exercices.push({
         id: nouvelId(),
-        nom: variationCourante ? `${joli(exerciceCourant)} – ${joli(variationCourante)}` : joli(exerciceCourant),
-        mouvement: devinerMouvement(exerciceCourant),
+        nom: nomExercice,
+        mouvement,
+        formatCompetition: estFormatCompetition(nomExercice, mouvement),
         consignes,
         prescription: {
           nbSeries,
@@ -303,6 +306,7 @@ export function lireProgrammeCoach(tableau) {
           rpeCible: intensite.rpe ?? null,
           chargeMax: intensite.charge ?? null,
         },
+        echauffement: [],
         series: [],
       });
       if (intensite.charge !== null && intensite.charge !== undefined) chargeDuDessus = intensite.charge;
@@ -344,9 +348,11 @@ function numeroDeJour(nom) {
   return trouve ? Number(trouve[1]) : null;
 }
 
+/** Un jour est commencé dès qu'une série ou un palier d'échauffement a été coché ou rempli. */
 function jourCommence(jour) {
+  const remplie = (serie) => serie.faite || serie.charge !== null || serie.rpe !== null || serie.vitesse !== null;
   return Boolean(jour.dateRealisee) || jour.exercices.some((exercice) =>
-    exercice.series.some((serie) => serie.faite || serie.charge !== null || serie.rpe !== null || serie.vitesse !== null));
+    exercice.series.some(remplie) || (exercice.echauffement ?? []).length > 0);
 }
 
 /** Vrai si deux jours ont le même programme (noms, dates, prescriptions, consignes), séries réalisées non comprises. */

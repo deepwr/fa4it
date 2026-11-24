@@ -1,6 +1,9 @@
 // FA 4 IT — js/seance.js
 // Le mode séance : choisir la séance, puis saisir chaque série vite.
 // Chaque saisie est enregistrée immédiatement.
+// Chaque exercice a deux listes de lignes : « echauffement » (ramp-up, la
+// dernière ligne étant le last warm-up) et « series » (séries de travail).
+// Les boutons et champs indiquent leur liste avec data-liste.
 //
 // Adresses utilisées :
 //   #/seance                            liste des séances (prochaine, à venir, faites)
@@ -13,7 +16,8 @@ import {
   echapper, carteVide, afficherMessage, pluriel, formaterDate,
   formaterNombre, arrondirAuDemi,
 } from './ui.js';
-import { calculerE1rm, seriesDuJour, htmlResultats } from './e1rm.js';
+import { calculerE1rm, seriesDuJour, htmlResultats, compteDansE1rm } from './e1rm.js';
+import { proposerRampUp } from './echauffement.js';
 
 /* ==========================================================================
    1. Règles de saisie
@@ -114,13 +118,22 @@ function resumePrescription(prescription) {
   return morceaux.join(' · ');
 }
 
-/** Attributs data-… qui disent à quelle série appartient un champ ou un bouton. */
-function attributsSerie(ids, index) {
-  return `data-bloc="${echapper(ids.bloc)}" data-semaine="${echapper(ids.semaine)}" data-jour="${echapper(ids.jour)}" data-exercice="${echapper(ids.exercice)}" data-serie="${index}"`;
+/** Attributs data-… qui disent à quelle ligne (liste et numéro) appartient un champ ou un bouton. */
+function attributsSerie(ids, index, liste = 'series') {
+  return `data-bloc="${echapper(ids.bloc)}" data-semaine="${echapper(ids.semaine)}" data-jour="${echapper(ids.jour)}" data-exercice="${echapper(ids.exercice)}" data-liste="${liste}" data-serie="${index}"`;
 }
 
-function idLigne(idExercice, index) {
-  return `serie-${idExercice}-${index}`;
+function idLigne(idExercice, index, liste = 'series') {
+  return `${liste === 'series' ? 'serie' : 'echauffement'}-${idExercice}-${index}`;
+}
+
+/** Les lignes d'une liste de l'exercice (« series » ou « echauffement », créée si absente). */
+function lignesDe(exercice, liste) {
+  if (liste === 'echauffement') {
+    exercice.echauffement ??= [];   // exercices enregistrés avant l'ajout des échauffements
+    return exercice.echauffement;
+  }
+  return exercice.series;
 }
 
 /* ==========================================================================
@@ -211,9 +224,9 @@ async function ecranListe() {
 let compteurChamps = 0;
 
 /** Champ − valeur + (répétitions, RPE). */
-function champPasAPas({ ids, index, champ, etiquette, valeur, depart, enAlerte }) {
+function champPasAPas({ ids, index, liste = 'series', champ, etiquette, valeur, depart, enAlerte }) {
   const idHtml = `saisie-${++compteurChamps}`;
-  const attributs = attributsSerie(ids, index);
+  const attributs = attributsSerie(ids, index, liste);
   const nom = etiquette.toLowerCase();
   return `
     <div class="groupe">
@@ -228,12 +241,12 @@ function champPasAPas({ ids, index, champ, etiquette, valeur, depart, enAlerte }
 }
 
 /** Champ simple (charge, vitesse). */
-function champSimple({ ids, index, champ, etiquette, valeur, indice, enAlerte }) {
+function champSimple({ ids, index, liste = 'series', champ, etiquette, valeur, indice, enAlerte }) {
   const idHtml = `saisie-${++compteurChamps}`;
   return `
     <div class="groupe">
       <label class="etiquette" for="${idHtml}">${etiquette}</label>
-      <input id="${idHtml}" class="champ${enAlerte ? ' en-alerte' : ''}" type="text" inputmode="decimal" autocomplete="off" placeholder="${indice}" value="${formaterNombre(valeur)}" data-changement="saisir-serie" data-champ="${champ}" ${attributsSerie(ids, index)}>
+      <input id="${idHtml}" class="champ${enAlerte ? ' en-alerte' : ''}" type="text" inputmode="decimal" autocomplete="off" placeholder="${indice}" value="${formaterNombre(valeur)}" data-changement="saisir-serie" data-champ="${champ}" ${attributsSerie(ids, index, liste)}>
     </div>
   `;
 }
@@ -253,23 +266,99 @@ function ligneSerie(ids, exercice, serie, index) {
         ${champSimple({ ids, index, champ: 'charge', etiquette: 'Charge (kg)', valeur: serie.charge, indice: 'kg', enAlerte: chargeEnAlerte })}
         ${champPasAPas({ ids, index, champ: 'repetitions', etiquette: 'Répétitions', valeur: serie.repetitions, depart: prescription.repetitions ?? 5 })}
         ${champPasAPas({ ids, index, champ: 'rpe', etiquette: 'RPE', valeur: serie.rpe, depart: prescription.rpeCible ?? 8, enAlerte: rpeEnAlerte })}
-        ${champSimple({ ids, index, champ: 'vitesse', etiquette: 'Vitesse (m/s)', valeur: serie.vitesse, indice: 'm/s' })}
+        ${champSimple({ ids, index, champ: 'vitesse', etiquette: 'Vitesse moy. (m/s)', valeur: serie.vitesse, indice: 'm/s' })}
       </div>
       <p class="alerte serie-alerte" role="status"${alertes.length > 0 ? '' : ' hidden'}>${alertes.length > 0 ? `⚠︎ ${alertes.join(' · ')}` : ''}</p>
     </div>
   `;
 }
 
+/**
+ * Une ligne d'échauffement.
+ * Paliers intermédiaires : une seule ligne compacte (charge × répétitions, case faite).
+ * Last warm-up : carte complète avec RPE et vitesse moyenne.
+ */
+function ligneEchauffement(ids, exercice, serie, index, total) {
+  const liste = 'echauffement';
+  const attributs = attributsSerie(ids, index, liste);
+  const idHtml = echapper(idLigne(exercice.id, index, liste));
+
+  if (index < total - 1) {
+    return `
+      <div class="palier${serie.faite ? ' faite' : ''}" id="${idHtml}">
+        <span class="palier-numero" aria-hidden="true">${index + 1}</span>
+        <input class="champ" type="text" inputmode="decimal" autocomplete="off" placeholder="kg" aria-label="Charge du palier ${index + 1} (kg)" value="${formaterNombre(serie.charge)}" data-changement="saisir-serie" data-champ="charge" ${attributs}>
+        <span class="palier-fois" aria-hidden="true">×</span>
+        <input class="champ" type="text" inputmode="numeric" autocomplete="off" placeholder="rép." aria-label="Répétitions du palier ${index + 1}" value="${formaterNombre(serie.repetitions)}" data-changement="saisir-serie" data-champ="repetitions" ${attributs}>
+        <button class="bascule-faite bascule-compacte" type="button" data-action="basculer-faite" ${attributs} aria-pressed="${serie.faite}" aria-label="Palier ${index + 1} fait">✓</button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="serie serie-echauffement${serie.faite ? ' faite' : ''}" id="${idHtml}">
+      <div class="serie-entete">
+        <span class="serie-numero">Last warm-up</span>
+        <button class="bascule-faite" type="button" data-action="basculer-faite" ${attributs} aria-pressed="${serie.faite}">${serie.faite ? '✓ Faite' : 'À faire'}</button>
+      </div>
+      <div class="grille-2">
+        ${champSimple({ ids, index, liste, champ: 'charge', etiquette: 'Charge (kg)', valeur: serie.charge, indice: 'kg' })}
+        ${champPasAPas({ ids, index, liste, champ: 'repetitions', etiquette: 'Répétitions', valeur: serie.repetitions, depart: 1 })}
+        ${champPasAPas({ ids, index, liste, champ: 'rpe', etiquette: 'RPE', valeur: serie.rpe, depart: 6 })}
+        ${champSimple({ ids, index, liste, champ: 'vitesse', etiquette: 'Vitesse moy. (m/s)', valeur: serie.vitesse, indice: 'm/s' })}
+      </div>
+    </div>
+  `;
+}
+
+/** « 6 paliers · last warm-up 137,5 kg × 1 » */
+function resumeEchauffement(lignes) {
+  const dernier = lignes.at(-1);
+  return `${pluriel(lignes.length, 'palier')} · last warm-up ${formaterNombre(dernier.charge) || '?'} kg × ${formaterNombre(dernier.repetitions) || '?'}`;
+}
+
+/**
+ * Partie « Échauffement » d'un exercice (Squat, Bench ou Deadlift, variantes comprises).
+ * Sans échauffement : un bouton pour proposer un ramp-up. Ouverte tant qu'un palier reste à faire.
+ */
+function sectionEchauffement(ids, exercice) {
+  if (exercice.mouvement === 'autre') return '';
+  const lignes = exercice.echauffement ?? [];
+  const attributs = attributsSerie(ids, lignes.length, 'echauffement');
+  if (lignes.length === 0) {
+    return `
+      <div class="rangee">
+        <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="proposer-ramp-up" ${attributs}>Proposer un ramp-up</button>
+        <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="ajouter-serie" ${attributs}>+ Palier</button>
+      </div>
+    `;
+  }
+  const ouvert = lignes.some((serie) => !serie.faite);
+  return `
+    <details class="echauffement" id="echauffement-${echapper(exercice.id)}"${ouvert ? ' open' : ''}>
+      <summary>Échauffement · <span id="resume-echauffement-${echapper(exercice.id)}">${resumeEchauffement(lignes)}</span></summary>
+      ${lignes.length > 1 ? '<p class="palier-legende" aria-hidden="true"><span>Palier</span><span>Charge (kg)</span><span></span><span>Rép.</span><span>Fait</span></p>' : ''}
+      ${lignes.map((serie, index) => ligneEchauffement(ids, exercice, serie, index, lignes.length)).join('')}
+      <div class="rangee">
+        <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="ajouter-serie" ${attributs}>+ Palier</button>
+        <button class="bouton bouton-alerte bouton-petit" type="button" data-action="retirer-serie" ${attributsSerie(ids, lignes.length - 1, 'echauffement')}>Retirer le dernier</button>
+      </div>
+    </details>
+  `;
+}
+
 function carteExerciceSeance(idsJour, exercice) {
   const ids = { ...idsJour, exercice: exercice.id };
   const lignes = exercice.series.map((serie, index) => ligneSerie(ids, exercice, serie, index)).join('');
+  const competition = compteDansE1rm(exercice) ? ' · format compétition' : '';
   return `
     <section class="carte" id="exercice-${echapper(exercice.id)}">
       <div class="entete-exercice">
         <h2>${echapper(exercice.nom)}</h2>
-        <p class="texte-secondaire">${MOUVEMENTS[exercice.mouvement] ?? 'Autre'} · ${resumePrescription(exercice.prescription)}</p>
+        <p class="texte-secondaire">${MOUVEMENTS[exercice.mouvement] ?? 'Autre'}${competition} · ${resumePrescription(exercice.prescription)}</p>
         ${exercice.consignes ? `<p class="consignes">${echapper(exercice.consignes)}</p>` : ''}
       </div>
+      ${sectionEchauffement(ids, exercice)}
       ${lignes || '<p class="texte-secondaire">Aucune série prévue.</p>'}
       <div class="rangee">
         <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="ajouter-serie" ${attributsSerie(ids, exercice.series.length)}>+ Série</button>
@@ -330,8 +419,8 @@ async function afficherSeance(parametres) {
    (pour ne pas fermer le clavier pendant la saisie)
    ========================================================================== */
 
-function actualiserLigne(idExercice, index, serie, prescription, source = null) {
-  const ligne = document.getElementById(idLigne(idExercice, index));
+function actualiserLigne(idExercice, index, serie, prescription, source = null, liste = 'series') {
+  const ligne = document.getElementById(idLigne(idExercice, index, liste));
   if (!ligne) return;
 
   // Valeurs affichées (sauf dans un autre champ en cours de saisie)
@@ -342,19 +431,21 @@ function actualiserLigne(idExercice, index, serie, prescription, source = null) 
     }
   }
 
-  // Alertes
-  const alertes = alertesSerie(serie, prescription);
-  ligne.querySelector('input[data-champ="charge"]')?.classList.toggle('en-alerte', alertes.some((m) => m.startsWith('Charge')));
-  ligne.querySelector('input[data-champ="rpe"]')?.classList.toggle('en-alerte', alertes.some((m) => m.startsWith('RPE')));
+  // Alertes (séries de travail seulement : un échauffement n'a pas de cible)
   const zone = ligne.querySelector('.serie-alerte');
-  zone.hidden = alertes.length === 0;
-  zone.textContent = alertes.length > 0 ? `⚠︎ ${alertes.join(' · ')}` : '';
+  if (zone) {
+    const alertes = alertesSerie(serie, prescription);
+    ligne.querySelector('input[data-champ="charge"]')?.classList.toggle('en-alerte', alertes.some((m) => m.startsWith('Charge')));
+    ligne.querySelector('input[data-champ="rpe"]')?.classList.toggle('en-alerte', alertes.some((m) => m.startsWith('RPE')));
+    zone.hidden = alertes.length === 0;
+    zone.textContent = alertes.length > 0 ? `⚠︎ ${alertes.join(' · ')}` : '';
+  }
 
-  // Série faite ou non
+  // Série faite ou non (la case compacte d'un palier garde son « ✓ »)
   ligne.classList.toggle('faite', serie.faite);
   const bascule = ligne.querySelector('.bascule-faite');
   bascule.setAttribute('aria-pressed', String(serie.faite));
-  bascule.textContent = serie.faite ? '✓ Faite' : 'À faire';
+  if (!bascule.classList.contains('bascule-compacte')) bascule.textContent = serie.faite ? '✓ Faite' : 'À faire';
 }
 
 /** Contenu de la carte « e1RM de la séance ». */
@@ -363,7 +454,7 @@ function contenuE1rm(semaine, jour) {
   return `
     <h2>e1RM de la séance</h2>
     ${htmlResultats(resultat, { avecJour: false })}
-    <p class="texte-secondaire">Moyenne des séries valides, par mouvement de référence (variantes comprises).</p>
+    <p class="texte-secondaire">Moyenne des séries valides de Squat, Bench et Deadlift en format compétition. Variantes, accessoires et échauffements ne comptent pas.</p>
   `;
 }
 
@@ -386,20 +477,21 @@ function actualiserProgression(jour) {
 /** Enregistre une valeur d'une série, puis met l'écran à jour. */
 async function enregistrerValeur(element, champ, valeur) {
   const { bloc: idBloc, semaine: idSemaine, jour: idJour, exercice: idExercice } = element.dataset;
+  const liste = element.dataset.liste ?? 'series';
   const index = Number(element.dataset.serie);
 
   const resultat = await modifierBloc(idBloc, (bloc) => {
     const { semaine, jour, exercice } = trouver(bloc, idSemaine, idJour, idExercice);
-    const serie = exercice.series[index];
-    if (!serie) throw new Error('Cette série n’existe plus.');
+    const serie = lignesDe(exercice, liste)[index];
+    if (!serie) throw new Error('Cette ligne n’existe plus.');
     const ancienne = serie[champ];
     serie[champ] = valeur;
 
-    // Une charge saisie est proposée dans les séries suivantes pas encore faites,
-    // si elles sont vides ou avaient la même charge (corriger la série 1 corrige
-    // donc aussi les suivantes).
+    // Séries de travail : une charge saisie est proposée dans les séries suivantes
+    // pas encore faites, si elles sont vides ou avaient la même charge (corriger la
+    // série 1 corrige donc aussi les suivantes). Pas pour les paliers d'échauffement.
     const recopiees = [];
-    if (champ === 'charge' && valeur !== null) {
+    if (liste === 'series' && champ === 'charge' && valeur !== null) {
       for (let i = index + 1; i < exercice.series.length; i += 1) {
         const suivante = exercice.series[i];
         if (!suivante.faite && (suivante.charge === null || suivante.charge === ancienne)) {
@@ -412,9 +504,13 @@ async function enregistrerValeur(element, champ, valeur) {
   });
 
   const { semaine, jour, exercice, recopiees } = resultat;
-  actualiserLigne(idExercice, index, exercice.series[index], exercice.prescription, element);
+  actualiserLigne(idExercice, index, lignesDe(exercice, liste)[index], exercice.prescription, element, liste);
   for (const i of recopiees) {
     actualiserLigne(idExercice, i, exercice.series[i], exercice.prescription);
+  }
+  if (liste === 'echauffement') {
+    const resume = document.getElementById(`resume-echauffement-${idExercice}`);
+    if (resume) resume.textContent = resumeEchauffement(exercice.echauffement);
   }
   actualiserProgression(jour);
   actualiserE1rm(semaine, jour);
@@ -443,50 +539,87 @@ async function pasSerie(bouton) {
 /** Case « Faite » : coche ou décoche la série. */
 async function basculerFaite(bouton) {
   const { bloc: idBloc, semaine: idSemaine, jour: idJour, exercice: idExercice } = bouton.dataset;
+  const liste = bouton.dataset.liste ?? 'series';
   const index = Number(bouton.dataset.serie);
 
   const { semaine, jour, exercice } = await modifierBloc(idBloc, (bloc) => {
     const trouve = trouver(bloc, idSemaine, idJour, idExercice);
-    const serie = trouve.exercice.series[index];
-    if (!serie) throw new Error('Cette série n’existe plus.');
+    const serie = lignesDe(trouve.exercice, liste)[index];
+    if (!serie) throw new Error('Cette ligne n’existe plus.');
     serie.faite = !serie.faite;
-    // Première série cochée : la séance est datée d'aujourd'hui.
+    // Première ligne cochée (échauffement compris) : la séance est datée d'aujourd'hui.
     if (serie.faite && !trouve.jour.dateRealisee) trouve.jour.dateRealisee = aujourdhui();
     return trouve;
   });
 
-  const serie = exercice.series[index];
-  actualiserLigne(idExercice, index, serie, exercice.prescription);
+  const serie = lignesDe(exercice, liste)[index];
+  actualiserLigne(idExercice, index, serie, exercice.prescription, null, liste);
   actualiserProgression(jour);
   actualiserE1rm(semaine, jour);
-  if (serie.faite && serie.charge === null) afficherMessage('Série faite — pensez à noter la charge');
+  if (serie.faite && serie.charge === null) afficherMessage('Faite — pensez à noter la charge');
 }
 
 async function ajouterSerie(bouton) {
   const { bloc: idBloc, semaine: idSemaine, jour: idJour, exercice: idExercice } = bouton.dataset;
+  const liste = bouton.dataset.liste ?? 'series';
   const index = await modifierBloc(idBloc, (bloc) => {
     const { exercice } = trouver(bloc, idSemaine, idJour, idExercice);
-    const nouvelle = nouvelleSerie(exercice.prescription.repetitions);
-    nouvelle.charge = exercice.series.at(-1)?.charge ?? null;   // reprend la dernière charge
-    exercice.series.push(nouvelle);
-    return exercice.series.length - 1;
+    const lignes = lignesDe(exercice, liste);
+    // Nouvelle série : répétitions prévues ; nouveau palier : 1 répétition. Reprend la dernière charge.
+    const nouvelle = nouvelleSerie(liste === 'series' ? exercice.prescription.repetitions : 1);
+    nouvelle.charge = lignes.at(-1)?.charge ?? null;
+    lignes.push(nouvelle);
+    return lignes.length - 1;
   });
-  signalerChangement(idLigne(idExercice, index));
+  signalerChangement(idLigne(idExercice, index, liste));
 }
 
 async function retirerSerie(bouton) {
   const { bloc: idBloc, semaine: idSemaine, jour: idJour, exercice: idExercice } = bouton.dataset;
+  const liste = bouton.dataset.liste ?? 'series';
   const bloc = await lireBloc(idBloc);
   const { exercice } = trouver(bloc, idSemaine, idJour, idExercice);
-  const derniere = exercice.series.at(-1);
+  const lignes = lignesDe(exercice, liste);
+  const derniere = lignes.at(-1);
   if (!derniere) return;
-  const remplie = derniere.faite || derniere.charge !== null || derniere.rpe !== null || derniere.vitesse !== null;
-  if (remplie && !window.confirm(`Retirer la série ${exercice.series.length} de « ${exercice.nom} » et ses valeurs ?`)) return;
+  const remplie = derniere.faite || derniere.rpe !== null || derniere.vitesse !== null
+    || (liste === 'series' && derniere.charge !== null);
+  const nom = liste === 'series' ? `la série ${lignes.length}` : `le palier ${lignes.length}`;
+  if (remplie && !window.confirm(`Retirer ${nom} de « ${exercice.nom} » et ses valeurs ?`)) return;
 
   await modifierBloc(idBloc, (b) => {
-    trouver(b, idSemaine, idJour, idExercice).exercice.series.pop();
+    lignesDe(trouver(b, idSemaine, idJour, idExercice).exercice, liste).pop();
   });
   signalerChangement(`exercice-${idExercice}`);
+}
+
+/**
+ * « Proposer un ramp-up » : paliers calculés à partir de la charge de la première
+ * série de travail (déjà saisie), sinon de la charge max prescrite, sinon demandée.
+ */
+async function proposerRampUpSeance(bouton) {
+  const { bloc: idBloc, semaine: idSemaine, jour: idJour, exercice: idExercice } = bouton.dataset;
+  const { exercice } = trouver(await lireBloc(idBloc), idSemaine, idJour, idExercice);
+
+  let cible = exercice.series.find((serie) => aUneValeur(serie.charge))?.charge ?? exercice.prescription.chargeMax;
+  if (!aUneValeur(cible)) {
+    const reponse = window.prompt(`Charge de votre première série de travail en « ${exercice.nom} » (kg) ?`);
+    if (reponse === null) return;
+    cible = LECTURE.charge(reponse);
+    if (!cible) throw new Error('Charge non comprise : tapez un nombre, par exemple 112,5.');
+  }
+
+  const paliers = proposerRampUp(cible, exercice.mouvement);
+  if (paliers.length === 0) {
+    throw new Error('Charge trop légère pour proposer un ramp-up : ajoutez vos paliers à la main avec « + Palier ».');
+  }
+  await modifierBloc(idBloc, (bloc) => {
+    const trouve = trouver(bloc, idSemaine, idJour, idExercice);
+    if ((trouve.exercice.echauffement ?? []).length > 0) return;   // déjà proposé entre-temps
+    trouve.exercice.echauffement = paliers.map((palier) => ({ ...nouvelleSerie(palier.repetitions), charge: palier.charge }));
+  });
+  afficherMessage(`Ramp-up proposé pour ${formaterNombre(cible)} kg : modifiable`);
+  signalerChangement(`echauffement-${idExercice}`);
 }
 
 async function terminerSeance(bouton) {
@@ -521,6 +654,7 @@ export const boutonsSeance = {
   'basculer-faite': basculerFaite,
   'ajouter-serie': ajouterSerie,
   'retirer-serie': retirerSerie,
+  'proposer-ramp-up': proposerRampUpSeance,
   'terminer-seance': terminerSeance,
 };
 

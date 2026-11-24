@@ -14,7 +14,7 @@
 
 import { lireBlocs, lireBloc, enregistrerBloc, modifierBloc, supprimerBloc } from './db.js';
 import {
-  MOUVEMENTS, OBJECTIFS, compter, lireNombre, nouvelId, devinerMouvement,
+  MOUVEMENTS, OBJECTIFS, compter, lireNombre, nouvelId, devinerMouvement, estFormatCompetition,
   nouveauBloc, nouvelleSemaine, nouveauJour, nouvelExercice,
 } from './modele.js';
 import { boutonsImportCoach, changementsImportCoach } from './import-coach.js';
@@ -86,8 +86,10 @@ function copierExercice(exercice) {
     id: nouvelId(),
     nom: exercice.nom,
     mouvement: exercice.mouvement,
+    formatCompetition: exercice.formatCompetition ?? estFormatCompetition(exercice.nom, exercice.mouvement),
     consignes: exercice.consignes ?? '',
     prescription: { ...exercice.prescription },   // « ... » recopie chaque valeur
+    echauffement: [],
     series: [],
   };
 }
@@ -134,6 +136,7 @@ const FORMATS = {
   notes: (brut) => brut.trim(),
   date: (brut) => brut || null,
   choix: (brut) => brut,
+  booleen: (brut) => brut === 'oui',
   entier: (brut) => {
     const nombre = lireNombre(brut);
     return nombre === null ? null : Math.max(1, Math.round(nombre));
@@ -176,7 +179,7 @@ function champ({ ids, nom, etiquette, valeur, format = 'texte', titre = false, i
   `;
 }
 
-function choix({ ids, nom, etiquette, valeur, options }) {
+function choix({ ids, nom, etiquette, valeur, options, format = 'choix' }) {
   const idHtml = `champ-${++compteurChamps}`;
   const liste = options
     .map((option) => `<option value="${echapper(option.valeur)}"${option.valeur === valeur ? ' selected' : ''}>${echapper(option.libelle)}</option>`)
@@ -185,7 +188,7 @@ function choix({ ids, nom, etiquette, valeur, options }) {
     <div class="groupe">
       <label class="etiquette" for="${idHtml}">${echapper(etiquette)}</label>
       <div class="choix">
-        <select id="${idHtml}" class="champ" data-changement="modifier" data-nom="${nom}" data-format="choix" ${attributsCible(ids)}>${liste}</select>
+        <select id="${idHtml}" class="champ" data-changement="modifier" data-nom="${nom}" data-format="${format}" ${attributsCible(ids)}>${liste}</select>
       </div>
     </div>
   `;
@@ -230,6 +233,8 @@ async function modifierChamp(saisie) {
     document.getElementById('titre').textContent = nom === 'numero' ? `Semaine ${formaterNombre(valeur)}` : valeur;
   }
   afficherMessage('Enregistré ✓');
+  // Changer le mouvement fait apparaître (ou disparaître) le choix « Compte dans l'e1RM ».
+  if (nom === 'mouvement' && idExercice) signalerChangement(`exercice-${idExercice}`);
 }
 
 /* ==========================================================================
@@ -308,6 +313,17 @@ function carteExercice(idsJour, exercice, position, nombre) {
       <p class="etiquette">Exercice ${position + 1} sur ${nombre}</p>
       ${champ({ ids, nom: 'nom', etiquette: 'Nom', valeur: exercice.nom })}
       ${choix({ ids, nom: 'mouvement', etiquette: 'Mouvement de référence', valeur: exercice.mouvement, options: optionsMouvement })}
+      ${exercice.mouvement === 'autre' ? '' : choix({
+        ids,
+        nom: 'formatCompetition',
+        etiquette: 'Compte dans l’e1RM',
+        valeur: (exercice.formatCompetition ?? estFormatCompetition(exercice.nom, exercice.mouvement)) ? 'oui' : 'non',
+        options: [
+          { valeur: 'oui', libelle: 'Oui : format compétition' },
+          { valeur: 'non', libelle: 'Non : variante' },
+        ],
+        format: 'booleen',
+      })}
       <div class="grille-2">
         ${champ({ ids, nom: 'prescription.nbSeries', etiquette: 'Séries', valeur: prescription.nbSeries, format: 'entier', indice: 'Ex. 4' })}
         ${champ({ ids, nom: 'prescription.repetitions', etiquette: 'Répétitions', valeur: prescription.repetitions, format: 'entier', indice: 'Ex. 5' })}

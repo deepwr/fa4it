@@ -8,7 +8,7 @@
 //   2. si vous avez ajouté un fichier, ajoutez-le aussi dans FICHIERS.
 // C'est le changement de VERSION qui déclenche la mise à jour sur l'iPhone.
 
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = `fa4it-${VERSION}`;
 
 // Tous les fichiers de l'app (chemins relatifs à ce fichier sw.js).
@@ -37,6 +37,7 @@ const FICHIERS = [
   'js/rpe-table.js',
   'js/historique.js',
   'js/import-coach.js',
+  'js/echauffement.js',
 ];
 
 // Sur le Mac (Live Server), on va d'abord chercher les fichiers sur le réseau

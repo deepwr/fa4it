@@ -1,6 +1,7 @@
 // FA 4 IT — js/historique.js
 // L'onglet « Historique » : e1RM par mouvement sur tout le bloc et pour
-// chaque semaine, séries exclues, vitesses enregistrées et table RPE utilisée.
+// chaque semaine, séries exclues, last warm-ups (repère de forme du jour),
+// vitesses enregistrées et table RPE utilisée.
 
 import { lireBlocs, lireReglage, ecrireReglage } from './db.js';
 import { TABLE_RPE } from './rpe-table.js';
@@ -53,6 +54,34 @@ function htmlVitesses(semaine) {
   return `
     <details class="details">
       <summary>${pluriel(total, 'vitesse enregistrée', 'vitesses enregistrées')}</summary>
+      <ul class="liste-vitesses">${elements.join('')}</ul>
+    </details>
+  `;
+}
+
+/* ==========================================================================
+   1 bis. Last warm-ups d'une semaine
+   Le dernier palier d'échauffement de chaque exercice, avec RPE et vitesse
+   moyenne : à charge égale d'une semaine à l'autre, une vitesse plus basse
+   ou un RPE plus haut signale un jour moins en forme.
+   ========================================================================== */
+
+function htmlLastWarmups(semaine) {
+  const elements = [];
+  for (const jour of semaine.jours) {
+    for (const exercice of jour.exercices) {
+      const dernier = (exercice.echauffement ?? []).at(-1);
+      if (!dernier || (dernier.charge === null && !dernier.faite)) continue;
+      const morceaux = [`${formaterNombre(dernier.charge) || '?'} kg × ${formaterNombre(dernier.repetitions) || '?'}`];
+      if (dernier.rpe !== null && dernier.rpe !== undefined) morceaux.push(`RPE ${formaterNombre(dernier.rpe)}`);
+      if (dernier.vitesse !== null && dernier.vitesse !== undefined) morceaux.push(`${formaterVitesse(dernier.vitesse)} m/s`);
+      elements.push(`<li><strong>${echapper(jour.nom)} · ${echapper(exercice.nom)}</strong><span class="texte-secondaire">${morceaux.join(' · ')}</span></li>`);
+    }
+  }
+  if (elements.length === 0) return '';
+  return `
+    <details class="details">
+      <summary>${pluriel(elements.length, 'last warm-up')}</summary>
       <ul class="liste-vitesses">${elements.join('')}</ul>
     </details>
   `;
@@ -136,6 +165,7 @@ async function ecranHistorique() {
       <section class="carte">
         <h2>Semaine ${formaterNombre(semaine.numero)}</h2>
         ${htmlResultats(resultat, { precedent, avecJour: true })}
+        ${htmlLastWarmups(semaine)}
         ${htmlVitesses(semaine)}
       </section>
     `;
@@ -149,7 +179,7 @@ async function ecranHistorique() {
       ${choixBloc}
       <section class="carte">
         <h2>${echapper(bloc.nom)}</h2>
-        <p class="texte-secondaire">e1RM moyen sur tout le bloc, par mouvement de référence (variantes comprises).</p>
+        <p class="texte-secondaire">e1RM moyen sur tout le bloc : Squat, Bench et Deadlift en format compétition (variantes, accessoires et échauffements non comptés).</p>
         ${htmlResultats(resultatBloc, { exclusions: 'resume' })}
       </section>
 

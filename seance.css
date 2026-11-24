@@ -46,6 +46,103 @@
 }
 
 /* --------------------------------------------------------------------------
+   Échauffement (ramp-up) : bloc repliable au-dessus des séries de travail
+   -------------------------------------------------------------------------- */
+
+.echauffement {
+  display: block;   /* « display: flex » est mal géré par Safari sur <details> */
+  padding: 0 var(--espace-m) var(--espace-m);
+  border: 1.5px dashed var(--bordure);
+  border-radius: var(--arrondi-champ);
+}
+
+.echauffement:not([open]) {
+  padding-bottom: 0;
+}
+
+.echauffement > summary {
+  padding: var(--espace-m) 0;   /* zone d'appui d'au moins 44 pt */
+  font-weight: 700;
+  line-height: 1.35;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.echauffement > * + * {
+  margin-top: var(--espace-s);
+}
+
+/* Paliers intermédiaires : une ligne compacte « n | charge × rép. | ✓ » */
+.palier,
+.palier-legende {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) 1rem 3.75rem var(--zone-tactile);
+  align-items: center;
+  gap: var(--espace-s);
+}
+
+.palier {
+  padding: var(--espace-xs) var(--espace-s);
+  border: 1.5px dashed var(--bordure);
+  border-radius: var(--arrondi-champ);
+}
+
+.palier.faite {
+  border-style: solid;
+  border-color: var(--bleu);
+  background: var(--bleu-clair);
+}
+
+.palier .champ {
+  min-height: var(--zone-tactile);
+  padding: 0 var(--espace-s);
+  text-align: center;
+}
+
+.palier-numero,
+.palier-fois {
+  color: var(--texte-secondaire);
+  text-align: center;
+  font-weight: 600;
+}
+
+.palier-legende {
+  margin: 0;
+  padding: 0 var(--espace-s);
+  color: var(--texte-secondaire);
+  font-size: var(--taille-petite);
+}
+
+.palier-legende span {
+  text-align: center;
+}
+
+.palier-legende span:first-child {
+  font-size: 0.75em;
+}
+
+/* Case « fait » d'un palier : rond de 44 pt, vide ou bleu avec ✓ */
+.bascule-faite.bascule-compacte {
+  width: var(--zone-tactile);
+  min-width: var(--zone-tactile);
+  padding: 0;
+  color: transparent;   /* « ✓ » invisible tant que le palier n'est pas fait */
+}
+
+.bascule-faite.bascule-compacte[aria-pressed="true"] {
+  color: var(--texte);
+}
+
+/* Le last warm-up est plus discret qu'une série de travail */
+.serie-echauffement {
+  border-style: dashed;
+}
+
+.serie-echauffement.faite {
+  border-style: solid;
+}
+
+/* --------------------------------------------------------------------------
    Une série
    -------------------------------------------------------------------------- */
 

@@ -10,10 +10,13 @@
 //            ├─ nom, datePrevue, dateRealisee
 //            └─ exercices : [ Exercice ]   (l'ordre de la liste = l'ordre dans la séance)
 //                 ├─ nom, mouvement (squat, bench, deadlift ou autre)
+//                 ├─ formatCompetition : vrai si c'est le mouvement en format compétition
+//                 │                      (seul ce cas compte dans l'e1RM ; faux pour une variante)
 //                 ├─ consignes : texte libre (repos, fourchettes, indications du coach)
 //                 ├─ prescription : { nbSeries, repetitions, rpeCible, chargeMax }
-//                 └─ series : [ Série réalisée ]   (une ligne par série)
-//                      └─ charge, repetitions, rpe, vitesse, faite
+//                 ├─ echauffement : [ Série ]   (ramp-up ; la dernière ligne = last warm-up)
+//                 └─ series : [ Série réalisée ]   (séries de travail, une ligne par série)
+//                      └─ charge, repetitions, rpe, vitesse (moyenne, m/s), faite
 //
 // Unités : charges en kg, vitesses en m/s. Une valeur inconnue vaut null.
 
@@ -29,6 +32,20 @@ export const MOUVEMENTS = {
 };
 
 export const OBJECTIFS = ['accumulation', 'intensification', 'peaking', 'décharge', 'autre'];
+
+/**
+ * Vrai si l'exercice est un des trois mouvements en format compétition :
+ * « Squat », « Bench – Comp », « Soulevé de terre (compétition) »…
+ * Faux pour une variante (tempo, pause, prise serrée, déficit, roumain…) et
+ * pour les accessoires. Ce n'est qu'une proposition : modifiable dans Programme.
+ */
+export function estFormatCompetition(nom, mouvement) {
+  if (!['squat', 'bench', 'deadlift'].includes(mouvement)) return false;
+  const texte = String(nom ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/\bcomp/.test(texte)) return true;   // comp, compet, compétition
+  const seul = texte.replace(/[^a-z]+/g, ' ').trim();
+  return ['squat', 'bench', 'bench press', 'deadlift', 'developpe couche', 'souleve de terre', 'sdt'].includes(seul);
+}
 
 /** Propose un mouvement de référence d'après le nom (modifiable ensuite). */
 export function devinerMouvement(nom) {
@@ -109,8 +126,10 @@ export function nouvelExercice(nom = 'Nouvel exercice', mouvement = 'autre') {
     id: nouvelId(),
     nom,
     mouvement,
+    formatCompetition: estFormatCompetition(nom, mouvement),
     consignes: '',
     prescription: { nbSeries: 3, repetitions: 5, rpeCible: null, chargeMax: null },
+    echauffement: [],
     series: [],
   };
 }
@@ -136,12 +155,16 @@ function normaliserSerie(brute) {
 }
 
 function normaliserExercice(brut) {
-  const mouvement = lireTexte(brut?.mouvement).toLowerCase();
+  const lu = lireTexte(brut?.mouvement).toLowerCase();
+  const mouvement = Object.hasOwn(MOUVEMENTS, lu) ? lu : 'autre';
+  const nom = lireTexte(brut?.nom) || 'Exercice sans nom';
   const prescription = brut?.prescription ?? {};
   return {
     id: lireTexte(brut?.id) || nouvelId(),
-    nom: lireTexte(brut?.nom) || 'Exercice sans nom',
-    mouvement: Object.hasOwn(MOUVEMENTS, mouvement) ? mouvement : 'autre',
+    nom,
+    mouvement,
+    // Ancienne sauvegarde (sans ce champ) : déduit du nom
+    formatCompetition: typeof brut?.formatCompetition === 'boolean' ? brut.formatCompetition : estFormatCompetition(nom, mouvement),
     consignes: lireTexte(brut?.consignes),
     prescription: {
       nbSeries: lireNombre(prescription.nbSeries),
@@ -149,6 +172,7 @@ function normaliserExercice(brut) {
       rpeCible: lireNombre(prescription.rpeCible),
       chargeMax: lireNombre(prescription.chargeMax),
     },
+    echauffement: Array.isArray(brut?.echauffement) ? brut.echauffement.map(normaliserSerie) : [],
     series: Array.isArray(brut?.series) ? brut.series.map(normaliserSerie) : [],
   };
 }

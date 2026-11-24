@@ -5,14 +5,18 @@
 //   e1RM = charge réalisée ÷ (% du 1RM pour le couple (répétitions réalisées, RPE ressenti))
 // Exemple : 110 kg × 5 répétitions à RPE 7 → 78,6 % → 110 ÷ 0,786 = 139,95 kg.
 //
-// Sont exclues du calcul, et signalées : les séries non faites (dans une séance
-// réalisée), sans charge, sans RPE, sans répétitions, ou hors de la table.
-// L'e1RM affiché est la MOYENNE des e1RM des séries valides, calculée à part
-// pour chaque mouvement de référence (variantes comprises). Les exercices
-// « Autre » sont calculés chacun de leur côté, sous leur propre nom.
+// Seuls comptent le Squat, le Bench et le Deadlift EN FORMAT COMPÉTITION
+// (exercice marqué « format compétition » dans Programme). Les variantes
+// (tempo, pause, prise serrée…), les accessoires et les échauffements ne
+// comptent pas et ne sont pas signalés.
+//
+// Parmi ces séries, sont exclues du calcul, et signalées : les séries non faites
+// (dans une séance réalisée), sans charge, sans RPE, sans répétitions, ou hors de
+// la table. L'e1RM affiché est la MOYENNE des e1RM des séries valides, pour chacun
+// des trois mouvements.
 
 import { TABLE_RPE } from './rpe-table.js';
-import { MOUVEMENTS } from './modele.js';
+import { MOUVEMENTS, estFormatCompetition } from './modele.js';
 import { echapper, pluriel } from './ui.js';
 
 const ORDRE_MOUVEMENTS = ['squat', 'bench', 'deadlift'];
@@ -76,8 +80,15 @@ export function evaluerSerie(serie) {
    pouvoir signaler précisément une série exclue.
    ========================================================================== */
 
+/** Vrai si les séries de cet exercice comptent dans l'e1RM (3 mouvements, format compétition). */
+export function compteDansE1rm(exercice) {
+  if (!ORDRE_MOUVEMENTS.includes(exercice.mouvement)) return false;
+  return exercice.formatCompetition ?? estFormatCompetition(exercice.nom, exercice.mouvement);
+}
+
+/** Séries de travail du jour qui comptent dans l'e1RM (les échauffements n'en font jamais partie). */
 export function seriesDuJour(semaine, jour) {
-  return jour.exercices.flatMap((exercice) =>
+  return jour.exercices.filter(compteDansE1rm).flatMap((exercice) =>
     exercice.series.map((serie, index) => ({ semaine, jour, exercice, serie, index })));
 }
 
@@ -89,17 +100,13 @@ export function seriesDuBloc(bloc) {
   return bloc.semaines.flatMap(seriesDeLaSemaine);
 }
 
-/** Groupe de calcul : le mouvement de référence, ou le nom de l'exercice pour « Autre ». */
+/** Groupe de calcul : le mouvement (Squat, Bench ou Deadlift). */
 function groupeDe(exercice) {
-  if (exercice.mouvement !== 'autre' && MOUVEMENTS[exercice.mouvement]) {
-    return { cle: exercice.mouvement, libelle: MOUVEMENTS[exercice.mouvement] };
-  }
-  return { cle: `autre:${exercice.nom.trim().toLowerCase()}`, libelle: exercice.nom };
+  return { cle: exercice.mouvement, libelle: MOUVEMENTS[exercice.mouvement] };
 }
 
 function rang(cle) {
-  const position = ORDRE_MOUVEMENTS.indexOf(cle);
-  return position === -1 ? ORDRE_MOUVEMENTS.length : position;
+  return ORDRE_MOUVEMENTS.indexOf(cle);
 }
 
 /* ==========================================================================
@@ -140,7 +147,7 @@ export function calculerE1rm(elements, { nonFaitesEnAttente = false } = {}) {
     min: Math.min(...groupe.valeurs),
     max: Math.max(...groupe.valeurs),
   }));
-  liste.sort((a, b) => rang(a.cle) - rang(b.cle) || a.libelle.localeCompare(b.libelle, 'fr'));
+  liste.sort((a, b) => rang(a.cle) - rang(b.cle));
 
   return { groupes: liste, exclues, aVenir };
 }
@@ -206,7 +213,7 @@ export function htmlResultats(resultat, { precedent = null, avecSemaine = false,
     : '';
 
   return `
-    ${lignes || '<p class="texte-secondaire">Aucune série valide pour l’instant.</p>'}
+    ${lignes || '<p class="texte-secondaire">Aucune série valide de Squat, Bench ou Deadlift en format compétition pour l’instant.</p>'}
     ${htmlExclues}
     ${htmlAVenir}
   `;
