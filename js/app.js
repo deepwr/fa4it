@@ -7,6 +7,7 @@
 import { carteVide, carteErreur } from './ui.js';
 import { demanderStockagePersistant } from './db.js';
 import { ecransProgrammation, boutonsProgrammation, changementsProgrammation } from './programmation.js';
+import { ecransSeance, boutonsSeance, changementsSeance } from './seance.js';
 import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sauvegarde.js';
 
 /* --------------------------------------------------------------------------
@@ -20,14 +21,7 @@ import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sau
 
 const ecrans = {
   ...ecransProgrammation,   // programme, bloc, semaine, jour (voir programmation.js)
-
-  seance: {
-    onglet: 'seance',
-    afficher: async () => ({
-      titre: 'Séance',
-      html: carteVide('Aucune séance ouverte', 'Le mode séance arrivera à l’étape 5.'),
-    }),
-  },
+  ...ecransSeance,          // seance (voir seance.js)
 
   historique: {
     onglet: 'historique',
@@ -48,7 +42,7 @@ const ecrans = {
 
 /* --------------------------------------------------------------------------
    2. Lire l'adresse
-   Exemple : « #/jour/a/b/c » donne { nom: 'jour', parametres: ['a', 'b', 'c'] }.
+   Exemple : « #/seance/a/b/c » donne { nom: 'seance', parametres: ['a', 'b', 'c'] }.
    -------------------------------------------------------------------------- */
 
 function lireAdresse() {
@@ -128,11 +122,13 @@ async function afficherEcran(evenement) {
 
 const actionsBoutons = {
   ...boutonsProgrammation,   // « ... » ajoute ici toutes les actions de programmation.js
+  ...boutonsSeance,
   ...boutonsSauvegarde,
 };
 
 const actionsChangements = {
   ...changementsProgrammation,
+  ...changementsSeance,
   ...changementsSauvegarde,
 };
 

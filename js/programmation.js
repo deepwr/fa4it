@@ -146,9 +146,10 @@ const FORMATS = {
     const nombre = lireNombre(brut);
     return nombre === null ? null : Math.min(10, Math.max(1, arrondirAuDemi(nombre)));
   },
+  // Charges : aucun arrondi (0,25 kg et moins possibles), seulement positives.
   charge: (brut) => {
     const nombre = lireNombre(brut);
-    return nombre === null ? null : Math.max(0, arrondirAuDemi(nombre));
+    return nombre === null ? null : Math.max(0, nombre);
   },
 };
 
@@ -315,7 +316,7 @@ function carteExercice(idsJour, exercice, position, nombre) {
         ${champ({ ids, nom: 'prescription.nbSeries', etiquette: 'Séries', valeur: prescription.nbSeries, format: 'entier', indice: 'Ex. 4' })}
         ${champ({ ids, nom: 'prescription.repetitions', etiquette: 'Répétitions', valeur: prescription.repetitions, format: 'entier', indice: 'Ex. 5' })}
         ${champ({ ids, nom: 'prescription.rpeCible', etiquette: 'RPE cible', valeur: prescription.rpeCible, format: 'rpe', indice: 'Ex. 7,5' })}
-        ${champ({ ids, nom: 'prescription.chargeMax', etiquette: 'Charge max (kg)', valeur: prescription.chargeMax, format: 'charge', indice: 'Ex. 112,5' })}
+        ${champ({ ids, nom: 'prescription.chargeMax', etiquette: 'Charge max (kg)', valeur: prescription.chargeMax, format: 'charge', indice: 'Ex. 112,25' })}
       </div>
       ${faites > 0 ? `<p class="texte-secondaire">${pluriel(faites, 'série réalisée', 'séries réalisées')}</p>` : ''}
       <div class="rangee">
@@ -598,4 +599,60 @@ async function ajouterExercice(bouton) {
   signalerChangement(`exercice-${exercice.id}`);
 }
 
-/** Échange un exercice avec son
+/** Échange un exercice avec son voisin (sens -1 = monter, +1 = descendre). */
+async function deplacerExercice(bouton, sens) {
+  const { bloc: idBloc, semaine: idSemaine, jour: idJour, exercice: idExercice } = bouton.dataset;
+  await modifierBloc(idBloc, (bloc) => {
+    const { jour } = localiser(bloc, idSemaine, idJour);
+    const position = jour.exercices.findIndex((e) => e.id === idExercice);
+    const voisin = position + sens;
+    if (position < 0 || voisin < 0 || voisin >= jour.exercices.length) return;
+    [jour.exercices[position], jour.exercices[voisin]] = [jour.exercices[voisin], jour.exercices[position]];
+  });
+  signalerChangement(`exercice-${idExercice}`);
+}
+
+async function supprimerLExercice(bouton) {
+  const { bloc: idBloc, semaine: idSemaine, jour: idJour, exercice: idExercice } = bouton.dataset;
+  const bloc = await chargerBloc(idBloc);
+  const { exercice } = localiser(bloc, idSemaine, idJour, idExercice);
+  const faites = exercice.series.filter((serie) => serie.faite).length;
+  const detail = faites > 0 ? ` et ses ${pluriel(faites, 'série réalisée', 'séries réalisées')}` : '';
+  if (!window.confirm(`Supprimer « ${exercice.nom} »${detail} ?`)) return;
+  await modifierBloc(idBloc, (b) => {
+    const { jour } = localiser(b, idSemaine, idJour);
+    jour.exercices = jour.exercices.filter((e) => e.id !== idExercice);
+  });
+  afficherMessage('Exercice supprimé');
+  signalerChangement();
+}
+
+/* ==========================================================================
+   7. Ce que app.js utilise
+   ========================================================================== */
+
+export const ecransProgrammation = {
+  programme: { onglet: 'programme', afficher: ecranProgramme },
+  bloc: { onglet: 'programme', afficher: ecranBloc },
+  semaine: { onglet: 'programme', afficher: ecranSemaine },
+  jour: { onglet: 'programme', afficher: ecranJour },
+};
+
+export const boutonsProgrammation = {
+  'nouveau-bloc': creerBloc,
+  'supprimer-bloc': supprimerLeBloc,
+  'ajouter-semaine': ajouterSemaine,
+  'dupliquer-semaine': dupliquerSemaine,
+  'supprimer-semaine': supprimerLaSemaine,
+  'ajouter-jour': ajouterJour,
+  'dupliquer-jour': dupliquerJour,
+  'supprimer-jour': supprimerLeJour,
+  'ajouter-exercice': ajouterExercice,
+  'monter-exercice': (bouton) => deplacerExercice(bouton, -1),
+  'descendre-exercice': (bouton) => deplacerExercice(bouton, +1),
+  'supprimer-exercice': supprimerLExercice,
+};
+
+export const changementsProgrammation = {
+  'modifier': modifierChamp,
+};

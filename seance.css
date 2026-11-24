@@ -1,0 +1,123 @@
+/* ==========================================================================
+   FA 4 IT — seance.css
+   Styles propres au mode séance.
+   Aucune couleur ni aucun arrondi n'est écrit ici : tout vient des
+   variables définies en haut de styles.css.
+   ========================================================================== */
+
+/* Prochaine séance : contour bleu pour la repérer d'un coup d'œil */
+.carte-prochaine {
+  box-shadow: 0 0 0 2px var(--bleu), var(--ombre-legere);
+}
+
+/* Avancement « 3/16 séries faites » */
+.progression {
+  font-size: var(--taille-sous-titre);
+  font-weight: 700;
+}
+
+/* Lien texte simple (ex. « Modifier la prescription ») */
+.lien {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--zone-tactile);
+  color: var(--texte);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.entete-exercice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-xs);
+}
+
+/* --------------------------------------------------------------------------
+   Une série
+   -------------------------------------------------------------------------- */
+
+.serie {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-m);
+  padding: var(--espace-m);
+  border: 1.5px solid var(--bordure);
+  border-radius: var(--arrondi-champ);
+}
+
+/* Série faite : fond bleu très clair */
+.serie.faite {
+  border-color: var(--bleu);
+  background: var(--bleu-clair);
+}
+
+.serie-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espace-s);
+}
+
+.serie-numero {
+  font-weight: 700;
+}
+
+/* Gros bouton « À faire / ✓ Faite » */
+.bascule-faite {
+  min-height: var(--zone-tactile);
+  min-width: 120px;
+  padding: 0 var(--espace-l);
+  border: 2px solid var(--bleu);
+  border-radius: var(--arrondi-pilule);
+  background: var(--carte);
+  color: var(--texte);
+  font-size: var(--taille-petite);
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.1s ease;
+}
+
+.bascule-faite:active {
+  transform: scale(0.96);
+}
+
+.bascule-faite[aria-pressed="true"] {
+  background: var(--bleu);
+}
+
+/* --------------------------------------------------------------------------
+   Champ « −  valeur  + »
+   -------------------------------------------------------------------------- */
+
+.pas-a-pas {
+  display: flex;
+  align-items: stretch;
+  gap: var(--espace-xs);
+}
+
+.pas-a-pas .champ {
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--espace-xs);
+  text-align: center;
+}
+
+.pas-bouton {
+  flex: 0 0 auto;
+  width: var(--zone-tactile);
+  min-height: var(--hauteur-champ);
+  padding: 0;
+  font-size: var(--taille-sous-titre);
+  box-shadow: none;
+}
+
+/* Sur une série faite (fond bleu clair), les boutons − et + passent en blanc */
+.serie.faite .pas-bouton {
+  background: var(--carte);
+}
+
+.serie-alerte {
+  margin: 0;
+}
