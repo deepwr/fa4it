@@ -8,6 +8,7 @@ import { carteErreur } from './ui.js';
 import { demanderStockagePersistant } from './db.js';
 import { ecransProgrammation, boutonsProgrammation, changementsProgrammation } from './programmation.js';
 import { ecransSeance, boutonsSeance, changementsSeance } from './seance.js';
+import { ecransSuivi, boutonsSuivi } from './suivi.js';
 import { ecransHistorique, changementsHistorique } from './historique.js';
 import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sauvegarde.js';
 
@@ -23,6 +24,7 @@ import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sau
 const ecrans = {
   ...ecransProgrammation,   // programme, bloc, semaine, jour (voir programmation.js)
   ...ecransSeance,          // seance (voir seance.js)
+  ...ecransSuivi,           // suivi (voir suivi.js)
   ...ecransHistorique,      // historique (voir historique.js)
 
   sauvegarde: {
@@ -117,6 +119,7 @@ async function afficherEcran(evenement) {
 const actionsBoutons = {
   ...boutonsProgrammation,   // « ... » ajoute ici toutes les actions de programmation.js
   ...boutonsSeance,
+  ...boutonsSuivi,
   ...boutonsSauvegarde,
 };
 

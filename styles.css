@@ -46,6 +46,7 @@
   --police: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   --taille-texte: 17px;         /* au moins 16 px dans les champs, sinon l'iPhone zoome */
   --taille-petite: 15px;
+  --taille-onglet: 13px;        /* texte des 5 onglets du bas */
   --taille-sous-titre: 20px;
   --taille-titre: 32px;
 
@@ -477,8 +478,9 @@ input.champ[type="date"]::-webkit-date-and-time-value {
   right: 0;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--espace-xs);
+  grid-auto-flow: column;       /* autant de colonnes que d'onglets */
+  grid-auto-columns: 1fr;
+  gap: 4px;
   height: calc(var(--hauteur-onglets) + var(--zone-bas));
   padding:
     var(--espace-s)
@@ -499,9 +501,10 @@ input.champ[type="date"]::-webkit-date-and-time-value {
   min-height: var(--zone-tactile);
   border-radius: var(--arrondi-pilule);
   color: var(--texte-secondaire);
-  font-size: var(--taille-petite);
+  font-size: var(--taille-onglet);
   font-weight: 600;
   text-decoration: none;
+  white-space: nowrap;
   touch-action: manipulation;
 }
 

@@ -1,0 +1,144 @@
+/* ==========================================================================
+   FA 4 IT — suivi.css
+   Styles de l'onglet « Suivi » (graphiques par mouvement).
+   Aucune couleur ni aucun arrondi n'est écrit ici : tout vient des
+   variables définies en haut de styles.css (bleu = réel, saumon = e1RM).
+   ========================================================================== */
+
+/* Choix de la période : trois boutons en forme de pilule */
+.periodes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--espace-s);
+}
+
+.puce-periode {
+  min-height: var(--zone-tactile);
+  border: 1px solid var(--bordure);
+  border-radius: var(--arrondi-pilule);
+  background: var(--carte);
+  color: var(--texte-secondaire);
+  font-size: var(--taille-petite);
+  font-weight: 600;
+  touch-action: manipulation;
+}
+
+.puce-periode.active {
+  background: var(--bleu);
+  border-color: var(--bleu);
+  color: var(--texte);
+}
+
+/* Légende des deux courbes */
+.legende-suivi {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espace-xs) var(--espace-m);
+  color: var(--texte-secondaire);
+  font-size: var(--taille-petite);
+}
+
+.pastille {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: var(--espace-xs);
+  border-radius: var(--arrondi-pilule);
+  vertical-align: -1px;
+}
+
+.pastille-reel { background: var(--bleu); }
+.pastille-e1rm { background: var(--saumon); }
+
+/* Les trois chiffres en haut de chaque carte */
+.chiffres-suivi {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--espace-s);
+}
+
+.chiffres-suivi div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chiffres-suivi strong {
+  font-size: var(--taille-sous-titre);
+  font-variant-numeric: tabular-nums;
+}
+
+.etiquette-chiffre {
+  color: var(--texte-secondaire);
+  font-size: var(--taille-petite);
+}
+
+/* Le graphique */
+.graphique-suivi {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.graphique-suivi .grille {
+  stroke: var(--voile);
+  stroke-width: 1;
+}
+
+.graphique-suivi .grille-mois {
+  stroke-dasharray: 2 3;
+}
+
+.graphique-suivi .axe {
+  fill: var(--texte-secondaire);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.courbe-reel,
+.courbe-e1rm {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.courbe-reel { stroke: var(--bleu); }
+.courbe-e1rm { stroke: var(--saumon); }
+
+.rond-reel,
+.rond-e1rm {
+  stroke: var(--carte);
+  stroke-width: 2;
+}
+
+.rond-reel { fill: var(--bleu); }
+.rond-e1rm { fill: var(--saumon); }
+
+/* Zone invisible autour de chaque point, pour le toucher facilement.
+   « cursor: pointer » : sans lui, l'iPhone n'envoie pas le toucher. */
+.point-suivi {
+  cursor: pointer;
+}
+
+.zone-point {
+  fill: transparent;
+}
+
+/* Le point choisi (plus gros, voir js/suivi.js) : cerclé de la couleur du texte */
+.point-suivi.choisi .rond-reel,
+.point-suivi.choisi .rond-e1rm {
+  stroke: var(--texte);
+}
+
+/* Détail du point choisi, sous le graphique */
+.detail-point {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--espace-s) var(--espace-m);
+  border-radius: var(--arrondi-champ);
+  background: var(--fond);
+  font-size: var(--taille-petite);
+}
