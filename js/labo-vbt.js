@@ -370,6 +370,7 @@ function afficherResultats() {
           </table>
         </div>
         <p class="texte-secondaire">Vitesses en m/s. « Suivi » : netteté du bord du disque pendant la montée, comparée au reste de la vidéo (⚠︎ = à vérifier en revoyant la vidéo).</p>`}
+    ${resultat.interrompu !== null ? `<p class="texte-secondaire">Suivi arrêté à ${format(resultat.interrompu, 1)} s : le disque a quitté sa zone (barre reposée, sortie de l’image ou disque caché). Ce qui suit n’est pas compté.</p>` : ''}
     <button class="bouton bouton-secondaire bouton-large" type="button" data-action="labo-revoir">Revoir avec la trajectoire</button>
     <details class="details">
       <summary>Diagnostic (pour Claude)</summary>

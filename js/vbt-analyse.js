@@ -23,9 +23,12 @@ export const REGLAGES_VBT = {
   frequenceCoupure: 4,        // lissage : on garde les mouvements plus lents que 4 Hz
   hysteresis: 0.06,           // 6 cm : écart minimal entre un creux et un sommet
   amplitudeMin: 0.15,         // une rep monte d'au moins 15 cm
+  amplitudeMax: 1.0,          // … et d'au plus 1 m
+  vitesseMax: 2.5,            // vitesse moyenne de montée au plus 2,5 m/s
   seuilVitesse: 0.03,         // en dessous de 0,03 m/s, la barre est considérée immobile
   dureeMin: 0.3,              // une montée dure au moins 0,3 s
-  tenueFin: 0.1,              // fin de montée : la barre ne monte plus pendant au moins 0,1 s
+  tenueFin: 0.2,              // fin de montée : la barre ne remonte plus pendant au moins 0,2 s…
+  remonteeMax: 0.003,         // …c'est-à-dire pas de plus de 3 mm (tolère les petits sauts du suivi)
   scoreDouteux: 0.35,         // score de suivi < 35 % de l'habituel pendant la montée : rep à vérifier
 };
 
@@ -499,8 +502,8 @@ export function deriver(y, pas) {
  * Repère les montées d'au moins 15 cm. Début : dernier instant avant le pic de vitesse où la
  * barre est quasi immobile près du bas ; fin : premier instant après le pic où elle l'est près du haut.
  */
-export function trouverReps(t, y, pas, R = REGLAGES_VBT) {
-  const v = deriver(y, pas);
+export function trouverReps(t, y, pas, R = REGLAGES_VBT, vitesses = null) {
+  const v = vitesses ?? deriver(y, pas);
   const extremes = [];
   let mode = null;
   let imin = 0;
@@ -528,17 +531,21 @@ export function trouverReps(t, y, pas, R = REGLAGES_VBT) {
     for (let i = i1; i <= i2; i += 1) if (v[i] > v[ip]) ip = i;
     let a = ip;
     while (a > i1 && !(v[a] < R.seuilVitesse && y[a] < bas + 0.15 * (haut - bas))) a -= 1;
-    // Fin : la barre est près du haut ET cesse de monter pendant au moins 0,1 s
-    // (un simple ralentissement juste avant le verrouillage ne coupe pas la rep).
+    // Fin : la barre est près du haut, quasi immobile, ET ne remonte pas de plus de 3 mm
+    // dans les 0,2 s qui suivent. Un simple ralentissement avant le verrouillage ne coupe
+    // donc pas la rep, et les petits sauts du suivi après le verrouillage ne l'allongent pas.
     const tenue = Math.max(1, Math.round(R.tenueFin / pas));
     const arretee = (i) => {
-      for (let j = i; j <= Math.min(y.length - 1, i + tenue); j += 1) if (v[j] >= R.seuilVitesse) return false;
+      if (v[i] >= R.seuilVitesse) return false;
+      for (let j = i; j <= Math.min(y.length - 1, i + tenue); j += 1) if (y[j] - y[i] > R.remonteeMax) return false;
       return true;
     };
     let b = ip;
     while (b < i2 && !(y[b] > bas + 0.85 * (haut - bas) && arretee(b))) b += 1;
     const duree = t[b] - t[a];
     if (duree < R.dureeMin) continue;
+    // Valeurs impossibles en force athlétique : suivi perdu, pas une rep
+    if (y[b] - y[a] > R.amplitudeMax || (y[b] - y[a]) / duree > R.vitesseMax) continue;
     reps.push({ a, b, debut: t[a], fin: t[b], amplitude: y[b] - y[a], duree, vitesseMoyenne: (y[b] - y[a]) / duree, vitesseMax: v[ip] });
   }
   return reps;
@@ -548,20 +555,71 @@ export function trouverReps(t, y, pas, R = REGLAGES_VBT) {
    7. Du suivi aux résultats
    ========================================================================== */
 
+/** Interpolation linéaire de (t, y, v) sur une grille 8 fois plus fine. */
+function affiner8(t, y, v) {
+  const n = (t.length - 1) * 8 + 1;
+  const tf = new Float64Array(n);
+  const yf = new Float64Array(n);
+  const vf = new Float64Array(n);
+  for (let i = 0; i < t.length - 1; i += 1) {
+    for (let k = 0; k < 8; k += 1) {
+      const f = k / 8;
+      const j = i * 8 + k;
+      tf[j] = t[i] + f * (t[i + 1] - t[i]);
+      yf[j] = y[i] + f * (y[i + 1] - y[i]);
+      vf[j] = v[i] + f * (v[i + 1] - v[i]);
+    }
+  }
+  tf[n - 1] = t.at(-1);
+  yf[n - 1] = y.at(-1);
+  vf[n - 1] = v.at(-1);
+  return { t: tf, y: yf, v: vf };
+}
+
 /**
  * suivi : résultat de suivre() ; depart : { a } (demi-axe vertical en pixels) ;
  * diametre : diamètre réel du disque en mètres.
  */
-export function resultats(suivi, depart, diametre) {
+/**
+ * Jusqu'où le suivi est fiable : on s'arrête quand le disque s'éloigne de plus de
+ * deux rayons sur le côté (barre reposée au rack, on marche avec), ou quand son bord
+ * n'est plus net pendant 3 images (disque caché, ou sorti de l'image pour plus de moitié).
+ * Un disque un peu coupé par le bord de l'image reste suivi normalement.
+ */
+function finDuSuivi(suivi, depart) {
+  const { X, S } = suivi;
+  const habituel = mediane(S);
+  let faibles = 0;
+  for (let i = 1; i < X.length; i += 1) {
+    if (Math.abs(X[i] - X[0]) > 2 * depart.b) return i;
+    faibles = S[i] < 0.35 * habituel ? faibles + 1 : 0;
+    if (faibles >= 3) return i - 2;
+  }
+  return X.length;
+}
+
+export function resultats(suiviComplet, depart, diametre) {
+  const coupe = finDuSuivi(suiviComplet, depart);
+  const suivi = {
+    t: suiviComplet.t.slice(0, coupe),
+    X: suiviComplet.X.slice(0, coupe),
+    Y: suiviComplet.Y.slice(0, coupe),
+    S: suiviComplet.S.slice(0, coupe),
+  };
+  const interrompu = coupe < suiviComplet.t.length ? suiviComplet.t[coupe] : null;
   const { t, X, Y, S } = suivi;
-  if (t.length < 10) return { reps: [], trajectoire: null, echelle: null };
+  if (t.length < 10) return { reps: [], trajectoire: null, metresParPixel: diametre / 2 / depart.a, interrompu };
   const metresParPixel = diametre / 2 / depart.a;
   const hauteur = Y.map((y) => -(y - Y[0]) * metresParPixel);
   const ry = regulariser(t, hauteur);
   const rx = regulariser(t, X);
   const rpy = regulariser(t, Y);
   const y = lisser(ry.v, ry.pas);
-  const reps = trouverReps(ry.t, y, ry.pas);
+  // Repérage des reps sur une grille 8 fois plus fine (interpolation de la courbe lissée) :
+  // le début et la fin d'une montée ne tombent plus forcément sur une image.
+  const v = deriver(y, ry.pas);
+  const fin = affiner8(ry.t, y, v);
+  const reps = trouverReps(fin.t, fin.y, ry.pas / 8, REGLAGES_VBT, fin.v);
 
   // Qualité du suivi pendant chaque montée
   const habituel = mediane(S);
@@ -577,6 +635,7 @@ export function resultats(suivi, depart, diametre) {
   return {
     reps,
     metresParPixel,
+    interrompu,
     trajectoire: {
       t: ry.t,
       x: lisser(rx.v, rx.pas),
