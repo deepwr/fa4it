@@ -15,9 +15,9 @@ const DISQUES = [
 ];
 
 const MODES = [
+  { valeur: 'image', libelle: 'Image par image (le plus sûr)' },
   { valeur: 'lecture', libelle: 'Lecture normale (rapide)' },
   { valeur: 'ralenti', libelle: 'Lecture au ralenti ×0,25' },
-  { valeur: 'image', libelle: 'Image par image (le plus sûr)' },
 ];
 
 // État du labo (une seule vidéo à la fois)
@@ -212,12 +212,14 @@ function recaler() {
   const video = $('labo-lecteur');
   const { x, y, D } = etat.cercle;
   const travail = toileDeTravail(video);
-  const champ = champAutour(travail, video, x, y, D * 0.53 + 12, D * 0.53 + 12);
+  const champ = champAutour(travail, video, x, y, D * 0.6 + 12, D * 0.6 + 12);
   etat.cale = caler(champ, x, y, D);
-  const texte = `Cercle calé : ${Math.round(2 * etat.cale.a)} px de haut`;
+  const hauteur = Math.round(2 * etat.cale.a);
+  if (etat.cale.recale) $('labo-taille').value = String(hauteur);   // le curseur suit le recalage
+  const texte = `${etat.cale.recale ? 'Cercle recalé automatiquement' : 'Cercle calé'} : ${hauteur} px de haut`;
   $('labo-cale').textContent = etat.cale.auBord
-    ? `${texte}. ⚠︎ Bord trouvé à la limite : agrandissez ou réduisez un peu le cercle.`
-    : `${texte}.`;
+    ? `${texte}. ⚠︎ Bord du disque mal trouvé : rapprochez votre cercle du bord du disque.`
+    : `${texte}. Vérifiez que l’ellipse saumon suit bien le bord extérieur du disque choisi.`;
   dessiner();
 }
 

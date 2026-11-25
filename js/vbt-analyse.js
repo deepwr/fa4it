@@ -186,12 +186,8 @@ export function localiser(champ, ellipse, px, py, rayon = REGLAGES_VBT.recherche
   return r;
 }
 
-/**
- * Calage : à partir du cercle placé par l'utilisatrice (centre cx, cy ; diamètre D en pixels),
- * cherche l'ellipse qui épouse le mieux le bord du disque (diamètre vertical à ± 6 %).
- * Renvoie { x, y, a, b, valeur, auBord } ; auBord = vrai si le meilleur diamètre est à la limite.
- */
-export function caler(champ, cx, cy, D) {
+/** Calage dans une fenêtre de ± 6 % autour du diamètre D (méthode du banc d'essai). */
+function calerAutour(champ, cx, cy, D) {
   const bas = 0.94 * D / 2;
   const haut = 1.06 * D / 2;
   let meilleur = null;
@@ -215,6 +211,23 @@ export function caler(champ, cx, cy, D) {
   }
   const marge = (haut - bas) / 24;
   return { ...meilleur, auBord: meilleur.a <= bas + marge || meilleur.a >= haut - marge };
+}
+
+/**
+ * Calage : à partir du cercle placé par l'utilisatrice (centre cx, cy ; diamètre D en pixels),
+ * cherche l'ellipse qui épouse le mieux le bord du disque (diamètre vertical à ± 6 %).
+ * Si le meilleur bord est à la limite de cette fenêtre, on la déplace vers lui
+ * (deux fois au plus) : un cercle un peu trop grand ou trop petit est corrigé tout seul.
+ * Renvoie { x, y, a, b, valeur, auBord, recale } ; auBord = encore à la limite à la fin.
+ */
+export function caler(champ, cx, cy, D) {
+  let resultat = calerAutour(champ, cx, cy, D);
+  let recale = false;
+  for (let essai = 0; essai < 2 && resultat.auBord; essai += 1) {
+    resultat = calerAutour(champ, resultat.x, resultat.y, 2 * resultat.a);
+    recale = true;
+  }
+  return { ...resultat, recale };
 }
 
 /* ==========================================================================
