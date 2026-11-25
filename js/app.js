@@ -9,6 +9,7 @@ import { demanderStockagePersistant } from './db.js';
 import { ecransProgrammation, boutonsProgrammation, changementsProgrammation } from './programmation.js';
 import { ecransSeance, boutonsSeance, changementsSeance } from './seance.js';
 import { ecransSuivi, boutonsSuivi } from './suivi.js';
+import { ecransLabo, boutonsLabo, changementsLabo } from './labo-vbt.js';
 import { ecransHistorique, changementsHistorique } from './historique.js';
 import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sauvegarde.js';
 
@@ -26,6 +27,7 @@ const ecrans = {
   ...ecransSeance,          // seance (voir seance.js)
   ...ecransSuivi,           // suivi (voir suivi.js)
   ...ecransHistorique,      // historique (voir historique.js)
+  ...ecransLabo,            // labo VBT, ouvert depuis Sauvegarde (voir labo-vbt.js)
 
   sauvegarde: {
     onglet: 'sauvegarde',
@@ -120,6 +122,7 @@ const actionsBoutons = {
   ...boutonsProgrammation,   // « ... » ajoute ici toutes les actions de programmation.js
   ...boutonsSeance,
   ...boutonsSuivi,
+  ...boutonsLabo,
   ...boutonsSauvegarde,
 };
 
@@ -127,6 +130,7 @@ const actionsChangements = {
   ...changementsProgrammation,
   ...changementsSeance,
   ...changementsHistorique,
+  ...changementsLabo,
   ...changementsSauvegarde,
 };
 

@@ -159,6 +159,7 @@ export async function ecranSauvegarde() {
       <p>Version installée : <strong>${version ?? 'inconnue'}</strong></p>
       <p class="texte-secondaire">Les mises à jour s’installent toutes seules quand vous ouvrez l’app avec du réseau, puis s’appliquent à l’ouverture suivante. Elles ne touchent jamais à vos données.</p>
       <button class="bouton bouton-secondaire bouton-large" type="button" data-action="rechercher-mise-a-jour">Rechercher une mise à jour</button>
+      <a class="bouton bouton-secondaire bouton-large" href="#/labo">Labo VBT (essai)</a>
     </section>
 
     <section class="carte">

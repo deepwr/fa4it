@@ -1,0 +1,60 @@
+/* ==========================================================================
+   FA 4 IT — labo.css
+   Styles de l'écran « Labo VBT » (essai de la vitesse de barre en vidéo).
+   Aucune couleur ni aucun arrondi n'est écrit ici : tout vient des
+   variables définies en haut de styles.css.
+   ========================================================================== */
+
+/* La vidéo, avec la toile de dessin posée exactement par-dessus */
+.labo-cadre {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--arrondi-champ);
+  background: var(--texte);
+}
+
+.labo-cadre video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.labo-dessin {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;   /* aussi nécessaire pour que l'iPhone envoie le toucher */
+}
+
+/* Curseurs (moment de départ, taille du cercle) : toute la largeur */
+.labo-curseur {
+  width: 100%;
+  min-height: var(--zone-tactile);
+  accent-color: var(--bleu);
+}
+
+/* Tableau des reps */
+.table-labo {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--taille-petite);
+  font-variant-numeric: tabular-nums;
+}
+
+.table-labo th,
+.table-labo td {
+  padding: var(--espace-xs) var(--espace-s);
+  border-bottom: 1px solid var(--voile);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table-labo thead th {
+  color: var(--texte-secondaire);
+  font-weight: 600;
+}
+
+.table-labo tbody th {
+  text-align: left;
+}
