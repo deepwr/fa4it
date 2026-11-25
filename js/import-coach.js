@@ -234,6 +234,22 @@ export function lireProgrammeCoach(tableau) {
       if (nom && !(nom in colonnes)) colonnes[nom] = c;
     }
 
+    // Colonnes de l'athlète (où l'app renverra les résultats) : titre dans la ligne
+    // d'en-tête, ou juste en dessous (anciens onglets : « ATHLÈTES » puis « POIDS »).
+    const colonnesAthlete = {};
+    const sousEntete = tableau[premiereEntete + 1] ?? [];
+    for (let c = debut; c < Math.min(fin, Math.max(entete.length, sousEntete.length)); c += 1) {
+      for (const titre of [simplifier(entete[c]), simplifier(sousEntete[c])]) {
+        if (/^RPE RESSENTI/.test(titre) && colonnesAthlete.rpe === undefined) colonnesAthlete.rpe = c;
+        else if (/^(MVBT|VITESSE)/.test(titre) && colonnesAthlete.vitesse === undefined) colonnesAthlete.vitesse = c;
+        else if (/^POIDS/.test(titre) && colonnesAthlete.charge === undefined) colonnesAthlete.charge = c;
+      }
+    }
+    // Cases qui permettront au script de vérifier que la ligne n'a pas bougé
+    const colonnesControle = ['EXERCICE', 'VARIATIONS', 'SETS', 'REPS', 'INTENSITE']
+      .map((titre) => colonnes[titre])
+      .filter((c) => c !== undefined);
+
     // Jours
     const jours = [];
     let jour = null;
@@ -307,6 +323,14 @@ export function lireProgrammeCoach(tableau) {
           chargeMax: intensite.charge ?? null,
         },
         echauffement: [],
+        // Case de cette ligne dans le Sheets (numéros à partir de 0), pour y renvoyer les résultats
+        origine: Object.keys(colonnesAthlete).length > 0
+          ? {
+            ligne: l,
+            colonnes: { ...colonnesAthlete },
+            controle: colonnesControle.map((c) => ({ colonne: c, texte: String(tableau[l][c] ?? '').trim() })),
+          }
+          : null,
         series: [],
       });
       if (intensite.charge !== null && intensite.charge !== undefined) chargeDuDessus = intensite.charge;
@@ -353,6 +377,26 @@ function jourCommence(jour) {
   const remplie = (serie) => serie.faite || serie.charge !== null || serie.rpe !== null || serie.vitesse !== null;
   return Boolean(jour.dateRealisee) || jour.exercices.some((exercice) =>
     exercice.series.some(remplie) || (exercice.echauffement ?? []).length > 0);
+}
+
+/**
+ * Jour gardé tel quel (inchangé ou déjà commencé) : on met seulement à jour la case
+ * d'origine de chaque exercice dans le Sheets, en les associant par nom et dans l'ordre.
+ * Rien d'autre ne change. Renvoie le nombre de cases mises à jour.
+ */
+function relierOrigines(existant, importe) {
+  const libres = [...importe.exercices];
+  let nombre = 0;
+  for (const exercice of existant.exercices) {
+    const position = libres.findIndex((e) => e.nom === exercice.nom);
+    if (position === -1) continue;
+    const [correspondant] = libres.splice(position, 1);
+    if (JSON.stringify(exercice.origine ?? null) !== JSON.stringify(correspondant.origine ?? null)) {
+      exercice.origine = correspondant.origine ?? null;
+      nombre += 1;
+    }
+  }
+  return nombre;
 }
 
 /** Vrai si deux jours ont le même programme (noms, dates, prescriptions, consignes), séries réalisées non comprises. */
@@ -408,6 +452,7 @@ export function fusionner(bloc, programme) {
   const lignes = [];
   const datesFichier = programme.semaines.map((s) => (s.lundi ? dateIso(s.lundi) : null));
   const dejaPrises = new Set();
+  let origines = 0;   // cases du Sheets mises à jour sur des jours gardés tels quels
 
   programme.semaines.forEach((importee, index) => {
     const lundi = datesFichier[index];
@@ -446,8 +491,10 @@ export function fusionner(bloc, programme) {
         ligne.ajoutes.push(court);
       } else if (memeContenu(existant, nouveau)) {
         // Rien à changer : le jour reste tel quel (avec ce que vous y avez déjà saisi).
+        origines += relierOrigines(existant, nouveau);
       } else if (jourCommence(existant)) {
         ligne.conserves.push(court);   // modifié par le coach mais déjà commencé : jamais touché
+        origines += relierOrigines(existant, nouveau);
       } else {
         semaine.jours[position] = { ...nouveau, id: existant.id };
         ligne.misAJour.push(court);
@@ -466,6 +513,7 @@ export function fusionner(bloc, programme) {
   const changements = lignes.reduce((total, l) => total + (l.nouvelle ? 1 : 0) + l.ajoutes.length + l.misAJour.length, 0);
   return {
     changements,
+    origines,
     lignes: lignes.map((l) => ({ ...l, numero: l.semaine.numero })),
   };
 }
@@ -544,6 +592,14 @@ async function importerCsvCoach(champ) {
   const details = [...lignesRapport(apercu), ...lignesProblemes(programme.problemes)];
 
   if (existant && apercu.changements === 0) {
+    // Programme inchangé : on met seulement à jour la position des lignes dans le Sheets
+    // (utile pour y renvoyer les résultats), sans rien modifier d'autre.
+    if (apercu.origines > 0) {
+      await modifierBloc(existant.id, (b) => {
+        if (!b.source) b.source = nomOnglet;
+        fusionner(b, programme);
+      });
+    }
     window.alert([`Le bloc « ${existant.nom} » est déjà à jour : rien de nouveau dans ce fichier.`, ...(details.length > 0 ? ['', ...details] : [])].join('\n'));
     return;
   }

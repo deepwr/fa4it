@@ -13,11 +13,12 @@ import { carteRappelSauvegarde } from './sauvegarde.js';
 import { lireBlocs, lireBloc, modifierBloc, lireReglage, ecrireReglage } from './db.js';
 import { MOUVEMENTS, lireNombre, nouvelleSerie, aujourdhui } from './modele.js';
 import {
-  echapper, carteVide, afficherMessage, pluriel, formaterDate,
+  echapper, carteVide, afficherMessage, pluriel, formaterDate, formaterDateHeure,
   formaterNombre, arrondirAuDemi,
 } from './ui.js';
 import { calculerE1rm, seriesDuJour, htmlResultats, compteDansE1rm } from './e1rm.js';
 import { proposerRampUp } from './echauffement.js';
+import { proposerEnvoiApresSeance } from './sheets.js';
 
 /* ==========================================================================
    1. Règles de saisie
@@ -143,9 +144,10 @@ function lignesDe(exercice, liste) {
 function carteSeance(bloc, { semaine, jour }, prochaine = false) {
   const { faites, total } = avancement(jour);
   const prevu = jour.datePrevue ? ` · prévu le ${formaterDate(jour.datePrevue)}` : '';
+  const envoyee = jour.envoiSheets ? ' · envoyée au Sheets' : '';
   const etat = jour.dateRealisee
-    ? `Faite le ${formaterDate(jour.dateRealisee)} · ${faites}/${total} séries`
-    : (faites > 0 ? `En cours · ${faites}/${total} séries` : pluriel(jour.exercices.length, 'exercice'));
+    ? `Faite le ${formaterDate(jour.dateRealisee)} · ${faites}/${total} séries${envoyee}`
+    : (faites > 0 ? `En cours · ${faites}/${total} séries${envoyee}` : pluriel(jour.exercices.length, 'exercice'));
   return `
     <a class="carte carte-lien${prochaine ? ' carte-prochaine' : ''}" href="${adresseSeance(bloc.id, semaine.id, jour.id)}">
       <span class="carte-lien-texte">
@@ -398,6 +400,10 @@ async function ecranSaisie([idBloc, idSemaine, idJour]) {
         <p class="texte-secondaire">${echapper(bloc.nom)} · Semaine ${formaterNombre(semaine.numero)}${prevu}</p>
         <p class="progression" id="progression-seance">${faites}/${total} séries faites</p>
         <a class="lien" href="#/jour/${echapper(bloc.id)}/${echapper(semaine.id)}/${echapper(jour.id)}">Modifier la prescription</a>
+        ${bloc.source ? `
+          <p class="texte-secondaire">${jour.envoiSheets ? `Envoyée au Sheets du coach le ${formaterDateHeure(jour.envoiSheets)}` : 'Pas encore envoyée au Sheets du coach'}</p>
+          <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="envoyer-seance-sheets" data-bloc="${echapper(bloc.id)}" data-jour="${echapper(jour.id)}">${jour.envoiSheets ? 'Renvoyer au Sheets' : 'Envoyer au Sheets'}</button>
+        ` : ''}
       </section>
       ${exercices}
       <section class="carte" id="e1rm-seance">${contenuE1rm(semaine, jour)}</section>
@@ -633,6 +639,7 @@ async function terminerSeance(bouton) {
     if (!jour.dateRealisee) jour.dateRealisee = aujourdhui();
   });
   afficherMessage(`Séance terminée : ${faites}/${total} séries faites`);
+  await proposerEnvoiApresSeance(idBloc, idJour);   // si le lien avec le Google Sheets est réglé
   location.hash = '#/seance';
 }
 

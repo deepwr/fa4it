@@ -8,6 +8,7 @@
 //       ├─ numero, notes
 //       └─ jours : [ Jour ]
 //            ├─ nom, datePrevue, dateRealisee
+//            ├─ envoiSheets : date et heure du dernier envoi au Google Sheets du coach (ou null)
 //            └─ exercices : [ Exercice ]   (l'ordre de la liste = l'ordre dans la séance)
 //                 ├─ nom, mouvement (squat, bench, deadlift ou autre)
 //                 ├─ formatCompetition : vrai si c'est le mouvement en format compétition
@@ -15,6 +16,8 @@
 //                 ├─ consignes : texte libre (repos, fourchettes, indications du coach)
 //                 ├─ prescription : { nbSeries, repetitions, rpeCible, chargeMax }
 //                 ├─ echauffement : [ Série ]   (ramp-up ; la dernière ligne = last warm-up)
+//                 ├─ origine : case de la ligne dans le Sheets du coach (si importé), sinon null
+//                 │            { ligne, colonnes: { rpe, vitesse, charge }, controle: [{ colonne, texte }] }
 //                 └─ series : [ Série réalisée ]   (séries de travail, une ligne par série)
 //                      └─ charge, repetitions, rpe, vitesse (moyenne, m/s), faite
 //
@@ -154,6 +157,20 @@ function normaliserSerie(brute) {
   };
 }
 
+/** Case d'origine dans le Sheets du coach (numéros à partir de 0), ou null. */
+function normaliserOrigine(brute) {
+  const position = (valeur) => (Number.isInteger(valeur) && valeur >= 0 ? valeur : undefined);
+  if (!brute || position(brute.ligne) === undefined) return null;
+  const colonnes = {};
+  for (const cle of ['rpe', 'vitesse', 'charge']) {
+    if (position(brute.colonnes?.[cle]) !== undefined) colonnes[cle] = brute.colonnes[cle];
+  }
+  const controle = Array.isArray(brute.controle)
+    ? brute.controle.filter((c) => position(c?.colonne) !== undefined).map((c) => ({ colonne: c.colonne, texte: typeof c.texte === 'string' ? c.texte : '' }))
+    : [];
+  return { ligne: brute.ligne, colonnes, controle };
+}
+
 function normaliserExercice(brut) {
   const lu = lireTexte(brut?.mouvement).toLowerCase();
   const mouvement = Object.hasOwn(MOUVEMENTS, lu) ? lu : 'autre';
@@ -173,6 +190,7 @@ function normaliserExercice(brut) {
       chargeMax: lireNombre(prescription.chargeMax),
     },
     echauffement: Array.isArray(brut?.echauffement) ? brut.echauffement.map(normaliserSerie) : [],
+    origine: normaliserOrigine(brut?.origine),
     series: Array.isArray(brut?.series) ? brut.series.map(normaliserSerie) : [],
   };
 }
@@ -183,6 +201,7 @@ function normaliserJour(brut) {
     nom: lireTexte(brut?.nom) || 'Jour sans nom',
     datePrevue: lireDate(brut?.datePrevue),
     dateRealisee: lireDate(brut?.dateRealisee),
+    envoiSheets: lireTexte(brut?.envoiSheets) || null,
     exercices: Array.isArray(brut?.exercices) ? brut.exercices.map(normaliserExercice) : [],
   };
 }

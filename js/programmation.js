@@ -360,6 +360,7 @@ function carteImportCoach(bloc = null) {
       <h2>Programme du coach</h2>
       <p class="texte-secondaire">${texte}</p>
       <button class="bouton bouton-secondaire bouton-large" type="button" data-action="choisir-csv-coach"${bloc ? ` data-bloc="${echapper(bloc.id)}"` : ''}>${bloc ? 'Mettre à jour avec un CSV…' : 'Importer un CSV…'}</button>
+      ${bloc ? `<button class="bouton bouton-secondaire bouton-large" type="button" data-action="envoyer-bloc-sheets" data-bloc="${echapper(bloc.id)}">Envoyer les séances faites au Sheets</button>` : ''}
       <input id="fichier-coach" type="file" accept=".csv,text/csv,text/comma-separated-values,text/plain" data-changement="importer-csv-coach" hidden>
     </section>
   `;

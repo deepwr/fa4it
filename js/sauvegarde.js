@@ -1,6 +1,7 @@
 // FA 4 IT — js/sauvegarde.js
 // L'écran « Sauvegarde » : état des données, export, import, copie de secours,
-// données d'exemple, version de l'app, protection du stockage et effacement.
+// lien avec le Google Sheets du coach, données d'exemple, version de l'app,
+// protection du stockage et effacement.
 // Fournit aussi le rappel de sauvegarde affiché dans l'onglet Séance.
 
 import {
@@ -8,6 +9,7 @@ import {
   garderCopieDeSecours, lireCopieDeSecours, supprimerCopieDeSecours, restaurerCopieDeSecours,
 } from './db.js';
 import { compter, construireSauvegarde, lireSauvegarde } from './modele.js';
+import { carteReglageSheets, boutonsSheets, changementsSheets } from './sheets.js';
 import { afficherMessage, pluriel, formaterDateHeure, formaterTaille } from './ui.js';
 
 const JOURS_AVANT_RAPPEL = 7;   // au-delà, l'app vous rappelle d'exporter
@@ -143,6 +145,8 @@ export async function ecranSauvegarde() {
     </section>
 
     ${carteCopieDeSecours(copie)}
+
+    ${await carteReglageSheets()}
 
     <section class="carte">
       <h2>Données d’exemple</h2>
@@ -331,8 +335,10 @@ export const boutonsSauvegarde = {
   'supprimer-copie': supprimerCopie,
   'rechercher-mise-a-jour': rechercherMiseAJour,
   'tout-effacer': toutEffacer,
+  ...boutonsSheets,   // Google Sheets du coach : tester, envoyer une séance ou un bloc
 };
 
 export const changementsSauvegarde = {
   'importer': importer,
+  ...changementsSheets,   // adresse et code du script Google
 };
