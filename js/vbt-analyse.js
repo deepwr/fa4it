@@ -632,15 +632,45 @@ export function resultats(suiviComplet, depart, diametre) {
     rep.douteuse = rep.qualite < REGLAGES_VBT.scoreDouteux;
   }
 
+  // Trajectoire limitée à la série : de la descente de la 1re rep à la fin de la dernière
+  // (la sortie du rack et le retour au rack ne sont pas dessinés).
+  const [i0, i1] = fenetreDeLaSerie(ry.t, y, reps);
+  const tx = lisser(rx.v, rx.pas);
+  const ty = lisser(rpy.v, rpy.pas);
+  const tt = ry.t.slice(i0, i1);
   return {
     reps,
     metresParPixel,
     interrompu,
     trajectoire: {
-      t: ry.t,
-      x: lisser(rx.v, rx.pas),
-      y: lisser(rpy.v, rpy.pas),
-      montee: ry.t.map((ti) => reps.some((r) => ti >= r.debut && ti <= r.fin)),
+      t: tt,
+      x: tx.slice(i0, i1),
+      y: ty.slice(i0, i1),
+      montee: tt.map((ti) => reps.some((r) => ti >= r.debut && ti <= r.fin)),
     },
   };
+}
+
+/**
+ * Début et fin (indices, fin exclue) de la partie utile de la trajectoire.
+ * Début : dernier instant, avant la 1re montée, où la barre était encore à sa hauteur
+ * du haut (à 5 cm près) — c'est le début de la descente (squat, bench). Si la barre
+ * n'y a jamais été (deadlift qui part du sol), 0,3 s avant la 1re montée.
+ * Fin : 0,3 s après la fin de la dernière montée. Sans rep, toute la trajectoire.
+ */
+function fenetreDeLaSerie(t, y, reps) {
+  if (reps.length === 0) return [0, t.length];
+  const indice = (temps) => {
+    let i = 0;
+    while (i < t.length - 1 && t[i] < temps) i += 1;
+    return i;
+  };
+  const premiere = reps[0];
+  const iDebut = indice(premiere.debut);
+  const hautVise = y[indice(premiere.fin)] - 0.05;
+  let i0 = iDebut;
+  while (i0 > 0 && y[i0] < hautVise) i0 -= 1;
+  if (y[i0] < hautVise) i0 = indice(premiere.debut - 0.3);
+  const i1 = Math.min(t.length, indice(reps.at(-1).fin + 0.3) + 1);
+  return [i0, i1];
 }

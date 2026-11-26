@@ -386,21 +386,38 @@ function afficherResultats() {
   zone.hidden = false;
 }
 
-/** Rejoue la vidéo en dessinant la trajectoire au fur et à mesure. */
+/**
+ * Rejoue la série au ralenti (×0,5) en dessinant la trajectoire au fur et à mesure,
+ * puis s'arrête sur la fin de la dernière rep.
+ */
 async function revoir() {
   if (!etat.analyse || etat.enCours) return;
   const video = $('labo-lecteur');
   const tr = etat.analyse.resultat.trajectoire;
   if (!tr) return;
+  const fin = tr.t.at(-1);
+  let termine = false;
+  const terminer = () => {
+    if (termine) return;
+    termine = true;
+    video.pause();
+    video.playbackRate = 1;
+    video.removeEventListener('timeupdate', surveiller);
+    dessiner();
+  };
+  // Filet de sécurité si l'iPhone n'appelle pas requestVideoFrameCallback
+  const surveiller = () => { if (video.currentTime >= fin) terminer(); };
+  const etape = (maintenant, meta) => {
+    if (termine) return;
+    if (meta.mediaTime >= fin || video.paused || video.ended) { terminer(); return; }
+    dessiner(meta.mediaTime);
+    video.requestVideoFrameCallback(etape);
+  };
   await allerA(video, tr.t[0]);
   video.playbackRate = 0.5;
-  const etape = (maintenant, meta) => {
-    dessiner(meta.mediaTime);
-    if (!video.paused && !video.ended) video.requestVideoFrameCallback(etape);
-    else dessiner();
-  };
+  video.addEventListener('timeupdate', surveiller);
+  video.addEventListener('ended', terminer, { once: true });
   if ('requestVideoFrameCallback' in video) video.requestVideoFrameCallback(etape);
-  video.addEventListener('ended', () => { video.playbackRate = 1; dessiner(); }, { once: true });
   await video.play();
 }
 
