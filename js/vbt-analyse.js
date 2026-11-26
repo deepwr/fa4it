@@ -233,6 +233,51 @@ export function caler(champ, cx, cy, D) {
   return { ...resultat, recale };
 }
 
+/**
+ * Premier calage quand on touche le disque, sans connaître sa taille : on essaie des
+ * ellipses de 10 % à 90 % du petit côté de l'image autour du point touché et on garde
+ * le bord le plus net, puis on le cale finement. Ce n'est qu'une proposition : un
+ * anneau intérieur (petit disque, moyeu) peut gagner, d'où le cadre à vérifier ensuite.
+ * petit : petit côté de l'image de traitement (pixels).
+ */
+export function estimerDisque(champ, cx, cy, petit) {
+  let meilleur = null;
+  for (let d = 0.1 * petit; d <= 0.9 * petit; d *= 1.06) {
+    for (const rb of [1, 0.85, 0.7]) {
+      const e = contour(d / 2, (d / 2) * rb, 80);
+      const r = chercher(champ, e, cx, cy, Math.max(6, 0.12 * d), 3);
+      if (!meilleur || r.valeur > meilleur.valeur) meilleur = { ...r, d };
+    }
+  }
+  return caler(champ, meilleur.x, meilleur.y, meilleur.d);
+}
+
+/**
+ * Ajuste au bord le plus net le cadre réglé par l'utilisatrice ({ x, y, a, b }) :
+ * hauteur à ± 2,5 %, rapport largeur/hauteur à ± 0,06, centre à ± rayon pixels.
+ * Son réglage reste la référence : on ne va pas chercher un autre anneau plus loin.
+ */
+export function ajusterCadre(champ, cadre, rayon = 6) {
+  const rb0 = cadre.b / cadre.a;
+  let meilleur = null;
+  for (let k = 0; k <= 12; k += 1) {
+    const a = cadre.a * (0.975 + (k * 0.05) / 12);
+    for (let rb = Math.max(0.3, rb0 - 0.06); rb <= Math.min(1.1, rb0 + 0.06) + 1e-9; rb += 0.02) {
+      const r = chercher(champ, contour(a, a * rb), cadre.x, cadre.y, rayon, rayon > 8 ? 2 : 1);
+      if (!meilleur || r.valeur > meilleur.valeur) meilleur = { ...r, a, b: a * rb };
+    }
+  }
+  const depart = meilleur;
+  for (let a = depart.a - 1; a <= depart.a + 1.0001; a += 0.25) {
+    if (a < 0.975 * cadre.a - 1e-9 || a > 1.025 * cadre.a + 1e-9) continue;
+    for (let b = depart.b - 1; b <= depart.b + 1.0001; b += 0.5) {
+      const r = chercher(champ, contour(a, b), depart.x, depart.y, 1, 0.5);
+      if (r.valeur > meilleur.valeur) meilleur = { ...r, a, b };
+    }
+  }
+  return meilleur;
+}
+
 /* ==========================================================================
    4. Lire les images de la vidéo
    ========================================================================== */

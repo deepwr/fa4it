@@ -10,7 +10,9 @@
 // Dans les deux cas, la vidéo reste en mémoire le temps de l'analyse, puis elle est
 // libérée : elle n'est jamais enregistrée ni envoyée sur internet.
 
-import { caler, suivre, resultats, champAutour, toileDeTravail, tailleDeTraitement, allerA } from './vbt-analyse.js';
+import {
+  estimerDisque, ajusterCadre, suivre, resultats, champAutour, toileDeTravail, tailleDeTraitement, allerA,
+} from './vbt-analyse.js';
 import { lireBloc, modifierBloc, lireReglage, ecrireReglage } from './db.js';
 import { echapper, afficherMessage, pluriel, formaterNombre } from './ui.js';
 
@@ -37,8 +39,9 @@ const REGLAGES = {
 const etat = {
   adresse: null,      // adresse temporaire de la vidéo en mémoire (blob)
   taille: null,       // taille de traitement { l, h }
-  cercle: null,       // { x, y, D } placé par l'utilisatrice (pixels de traitement)
-  cale: null,         // ellipse calée sur le bord du disque
+  cale: null,         // cadre du disque { x, y, a, b } : centre, demi-hauteur, demi-largeur (pixels de traitement)
+  loupe: null,        // zone agrandie dans la loupe { x0, y0, cote } (pixels de traitement)
+  glisse: null,       // côté (ou centre) du cadre en train d'être glissé dans la loupe
   analyse: null,      // résultat de suivre() + resultats()
   enCours: false,
   arreter: false,
@@ -86,16 +89,21 @@ function htmlOutil(reglages) {
         <span id="labo-temps-texte" class="texte-secondaire">0,00 s</span>
       </div>
 
-      <p class="etiquette">2. Touchez le centre du disque sur l’image</p>
+      <p class="etiquette">2. Touchez le disque sur l’image</p>
 
-      <div class="groupe">
-        <label class="etiquette" for="labo-taille">3. Ajustez le cercle au bord du disque</label>
-        <input id="labo-taille" class="labo-curseur" type="range" min="30" max="400" step="1" value="150">
-        <span id="labo-cale" class="texte-secondaire">Touchez d’abord le disque.</span>
+      <div id="labo-reglage" class="groupe" hidden>
+        <p class="etiquette">3. Ajustez le cadre au bord du plus grand disque</p>
+        <canvas id="labo-loupe" class="labo-loupe"></canvas>
+        <p class="texte-secondaire">Faites glisser chaque côté bleu sur le bord extérieur du disque ; glissez au milieu pour déplacer le cadre. Filmé de biais, le disque est un ovale : le cadre est alors plus étroit que haut, c’est normal.</p>
+        <div class="rangee">
+          <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="labo-ajuster">Ajuster au bord</button>
+          <button class="bouton bouton-petit" type="button" data-action="labo-valider">C’est bon</button>
+        </div>
       </div>
+      <p id="labo-cale" class="texte-secondaire">Touchez d’abord le disque.</p>
 
       <div class="groupe">
-        <label class="etiquette" for="labo-diametre">4. Disque visible</label>
+        <label class="etiquette" for="labo-diametre">4. Diamètre de ce disque</label>
         <div class="choix">
           <select id="labo-diametre" class="champ" data-changement="vbt-reglage" data-reglage="vbtDisque">
             ${options(DISQUES, reglages.vbtDisque)}
@@ -208,7 +216,9 @@ function oublierVideo() {
   etat.numero += 1;
   etat.arreter = true;
   if (etat.adresse) URL.revokeObjectURL(etat.adresse);
-  Object.assign(etat, { adresse: null, taille: null, cercle: null, cale: null, analyse: null, enCours: false });
+  Object.assign(etat, { adresse: null, taille: null, cale: null, loupe: null, glisse: null, analyse: null, enCours: false });
+  const reglage = document.getElementById('labo-reglage');
+  if (reglage) reglage.hidden = true;
 }
 
 /** Comme oublierVideo, et oublie aussi la série visée (sortie de l'écran). */
@@ -265,6 +275,8 @@ async function chargerVideo(champ) {
     // sans conséquence : on essaie quand même d'afficher la première image
   }
   etat.taille = tailleDeTraitement(video);
+  // La vidéo est réduite pour tenir à l'écran avec les réglages (voir labo.css)
+  video.closest('.labo-cadre')?.style.setProperty('--ratio', String(video.videoWidth / video.videoHeight));
   const dessin = $('labo-dessin');
   dessin.width = etat.taille.l;
   dessin.height = etat.taille.h;
@@ -275,16 +287,15 @@ async function chargerVideo(champ) {
   await allerA(video, 0.05);
   $('labo-temps-texte').textContent = `${format(video.currentTime)} s`;
 
-  const taille = $('labo-taille');
-  taille.max = String(Math.min(etat.taille.l, etat.taille.h));
   $('labo-infos').textContent = `${video.videoWidth} × ${video.videoHeight} px · ${format(video.duration, 1)} s · ${Math.round(fichier.size / 1048576)} Mo`;
-  $('labo-etat').textContent = 'Placez la vidéo, puis touchez le centre du disque.';
+  $('labo-cale').textContent = 'Touchez d’abord le disque.';
+  $('labo-etat').textContent = 'Placez la vidéo, puis touchez le disque.';
   brancher();
   dessiner();
 }
 
 /* ==========================================================================
-   3. Placer le cercle
+   3. Caler le disque : toucher, puis cadre à 4 côtés dans la loupe
    Ces réglages réagissent en continu : on les écoute directement.
    ========================================================================== */
 
@@ -292,52 +303,253 @@ function brancher() {
   const video = $('labo-lecteur');
   const dessin = $('labo-dessin');
   const curseur = $('labo-temps');
-  const taille = $('labo-taille');
+  const loupe = $('labo-loupe');
 
   curseur.oninput = async () => {
     if (etat.enCours) return;
     etat.analyse = null;
-    etat.cale = null;
     await allerA(video, Number(curseur.value));
     $('labo-temps-texte').textContent = `${format(video.currentTime)} s`;
     dessiner();
+    dessinerLoupe();
   };
-  curseur.onchange = () => { if (etat.cercle) recaler(); };
+  // Nouvelle image de départ : le cadre déjà réglé est recalé sur le disque à cet instant
+  curseur.onchange = () => {
+    if (!etat.cale || etat.enCours) return;
+    const c = etat.cale;
+    etat.cale = cadreDe(ajusterCadre(champAutourDuCadre(c, Math.max(8, 0.3 * c.a)), c, Math.max(8, 0.3 * c.a)));
+    decrireCalage('Disque recalé sur cette image');
+    recadrerLoupe(false);
+    dessiner();
+  };
 
-  // « click » et non « pointerdown » : faire défiler la page en touchant l'image ne place pas de cercle
+  // « click » et non « pointerdown » : faire défiler la page en touchant l'image ne place rien
   dessin.onclick = (evenement) => {
     if (etat.enCours) return;
     const zone = dessin.getBoundingClientRect();
     const x = ((evenement.clientX - zone.left) / zone.width) * dessin.width;
     const y = ((evenement.clientY - zone.top) / zone.height) * dessin.height;
-    etat.cercle = { x, y, D: Number(taille.value) };
-    etat.analyse = null;
-    recaler();
+    toucherDisque(x, y).catch((erreur) => afficherMessage(erreur.message));
   };
 
-  taille.oninput = () => {
-    if (!etat.cercle) return;
-    etat.cercle.D = Number(taille.value);
-    etat.cale = null;
-    dessiner();
+  // Loupe : on attrape le côté le plus proche (ou le centre) et on le fait glisser
+  loupe.onpointerdown = (evenement) => {
+    if (etat.enCours || !etat.cale || !etat.loupe) return;
+    const p = pointDansLaLoupe(evenement);
+    const tolerance = (26 * etat.loupe.cote) / loupe.clientWidth;   // 26 points d'écran autour du côté
+    const { x, y, a, b } = etat.cale;
+    const cotes = [
+      ['haut', Math.abs(p.y - (y - a))],
+      ['bas', Math.abs(p.y - (y + a))],
+      ['gauche', Math.abs(p.x - (x - b))],
+      ['droite', Math.abs(p.x - (x + b))],
+    ].sort((u, v) => u[1] - v[1]);
+    let prise = cotes[0][1] <= tolerance ? cotes[0][0] : null;
+    if (!prise && Math.abs(p.x - x) <= b && Math.abs(p.y - y) <= a) prise = 'centre';
+    if (!prise) return;
+    etat.glisse = { prise, depart: p, cadre: { ...etat.cale } };
+    loupe.setPointerCapture?.(evenement.pointerId);
+    evenement.preventDefault();
   };
-  taille.onchange = () => { if (etat.cercle) recaler(); };
+  loupe.onpointermove = (evenement) => {
+    const g = etat.glisse;
+    if (!g) return;
+    evenement.preventDefault();
+    etat.cale = glisser(g, pointDansLaLoupe(evenement));
+    etat.analyse = null;
+    dessinerLoupe();
+    dessiner();
+    decrireCalage('Cadre réglé à la main');
+  };
+  loupe.onpointerup = () => {
+    if (!etat.glisse) return;
+    etat.glisse = null;
+    recadrerLoupe(false);
+  };
+  loupe.onpointercancel = loupe.onpointerup;
 }
 
-/** Cale l'ellipse sur le bord du disque autour du cercle placé. */
-function recaler() {
+/** Nouveau cadre pendant qu'on fait glisser un côté (le côté opposé ne bouge pas) ou le centre. */
+function glisser(g, p) {
+  const c = { ...g.cadre };
+  const mini = 4;   // demi-taille minimale (pixels de traitement)
+  if (g.prise === 'centre') {
+    c.x += p.x - g.depart.x;
+    c.y += p.y - g.depart.y;
+  } else if (g.prise === 'haut' || g.prise === 'bas') {
+    const haut = g.prise === 'haut' ? Math.min(p.y, c.y + c.a - 2 * mini) : c.y - c.a;
+    const bas = g.prise === 'bas' ? Math.max(p.y, c.y - c.a + 2 * mini) : c.y + c.a;
+    c.a = (bas - haut) / 2;
+    c.y = (bas + haut) / 2;
+  } else {
+    const gauche = g.prise === 'gauche' ? Math.min(p.x, c.x + c.b - 2 * mini) : c.x - c.b;
+    const droite = g.prise === 'droite' ? Math.max(p.x, c.x - c.b + 2 * mini) : c.x + c.b;
+    c.b = (droite - gauche) / 2;
+    c.x = (droite + gauche) / 2;
+  }
+  return c;
+}
+
+/** Position du doigt dans la loupe, en pixels de traitement. */
+function pointDansLaLoupe(evenement) {
+  const zone = $('labo-loupe').getBoundingClientRect();
+  const { x0, y0, cote } = etat.loupe;
+  return {
+    x: x0 + ((evenement.clientX - zone.left) / zone.width) * cote,
+    y: y0 + ((evenement.clientY - zone.top) / zone.height) * cote,
+  };
+}
+
+/** Garde seulement le cadre (centre, demi-hauteur, demi-largeur). */
+function cadreDe(ellipse) {
+  return { x: ellipse.x, y: ellipse.y, a: ellipse.a, b: ellipse.b };
+}
+
+/** Champ de gradients de l'image affichée, autour du cadre (avec une marge de « rayon »). */
+function champAutourDuCadre(c, rayon) {
   const video = $('labo-lecteur');
-  const { x, y, D } = etat.cercle;
+  const demi = Math.max(c.a, c.b) * 1.12 + rayon + 8;
+  return champAutour(toileDeTravail(video), video, c.x, c.y, demi, demi);
+}
+
+/** Toucher du disque sur la vidéo : premier calage automatique, puis la loupe s'ouvre. */
+async function toucherDisque(x, y) {
+  const video = $('labo-lecteur');
+  $('labo-cale').textContent = 'Recherche du disque…';
+  await new Promise((resoudre) => requestAnimationFrame(() => setTimeout(resoudre, 0)));   // le message s'affiche d'abord
   const travail = toileDeTravail(video);
-  const champ = champAutour(travail, video, x, y, D * 0.6 + 12, D * 0.6 + 12);
-  etat.cale = caler(champ, x, y, D);
-  const hauteur = Math.round(2 * etat.cale.a);
-  if (etat.cale.recale) $('labo-taille').value = String(hauteur);   // le curseur suit le recalage
-  const texte = `${etat.cale.recale ? 'Cercle recalé automatiquement' : 'Cercle calé'} : ${hauteur} px de haut`;
-  $('labo-cale').textContent = etat.cale.auBord
-    ? `${texte}. ⚠︎ Bord du disque mal trouvé : rapprochez votre cercle du bord du disque.`
-    : `${texte}. Vérifiez que l’ellipse saumon suit bien le bord extérieur du disque choisi.`;
+  const petit = Math.min(travail.l, travail.h);
+  const champ = champAutour(travail, video, x, y, 0.9 * petit, 0.9 * petit);
+  etat.cale = cadreDe(estimerDisque(champ, x, y, petit));
+  etat.analyse = null;
+  $('labo-resultats').hidden = true;
+  majActions();
+  decrireCalage('Cadre proposé');
   dessiner();
+  $('labo-reglage').hidden = false;
+  recadrerLoupe(true);
+  $('labo-reglage').scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+/**
+ * Cadre la loupe sur le disque (zone de 2,6 fois sa taille). Sans « forcer », on ne
+ * recadre que si le cadre sort presque de la loupe ou y devient trop petit.
+ */
+function recadrerLoupe(forcer) {
+  if (!etat.cale || $('labo-reglage')?.hidden) return;
+  const { x, y, a, b } = etat.cale;
+  const taille = Math.max(a, b);
+  const z = etat.loupe;
+  const sort = z && (x - b < z.x0 + 0.03 * z.cote || x + b > z.x0 + 0.97 * z.cote
+    || y - a < z.y0 + 0.03 * z.cote || y + a > z.y0 + 0.97 * z.cote);
+  if (forcer || !z || sort || 2 * taille < 0.3 * z.cote) {
+    // Au moins 45 % du petit côté de l'image : si la proposition est un anneau intérieur,
+    // le vrai bord du disque reste visible dans la loupe pour y amener les côtés.
+    const cote = Math.max(0.45 * Math.min(etat.taille.l, etat.taille.h), 2.6 * taille);
+    etat.loupe = { x0: x - cote / 2, y0: y - cote / 2, cote };
+  }
+  dessinerLoupe();
+}
+
+/** « Ajuster au bord » : le cadre réglé est calé sur le bord le plus net tout près. */
+function ajusterAuBord() {
+  if (!etat.cale || etat.enCours) return;
+  const c = etat.cale;
+  etat.cale = cadreDe(ajusterCadre(champAutourDuCadre(c, 6), c, 6));
+  etat.analyse = null;
+  decrireCalage('Ajusté au bord le plus net (vérifiez sur la loupe)');
+  recadrerLoupe(false);
+  dessiner();
+}
+
+/** « C'est bon » : la loupe se referme, le disque reste calé. */
+function validerCadre() {
+  if (!etat.cale) return;
+  $('labo-reglage').hidden = true;
+  decrireCalage('Disque calé');
+  $('labo-analyser')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+/** Angle de prise de vue estimé d'après le cadre : 0° = face au bout de la barre. */
+function angleDeVue(cadre) {
+  const rapport = cadre.b / cadre.a;
+  return rapport >= 0.95 ? 0 : Math.round((Math.acos(Math.min(1, rapport)) * 180) / Math.PI);
+}
+
+function decrireCalage(debut) {
+  const { a, b } = etat.cale;
+  const angle = angleDeVue(etat.cale);
+  let vue;
+  if (b / a > 1.08) vue = '⚠︎ cadre plus large que haut : vérifiez le bord du disque';
+  else if (angle === 0) vue = 'disque vu de face';
+  else vue = `disque vu de biais (environ ${angle}°)${angle > 50 ? ' ⚠︎ très de biais : rapprochez-vous de l’axe de la barre' : ''}`;
+  $('labo-cale').textContent = `${debut} : ${Math.round(2 * a)} px de haut, ${vue}.`;
+}
+
+/** La loupe : la zone du disque agrandie (image de la vidéo en pleine définition), cadre par-dessus. */
+function dessinerLoupe() {
+  const toile = $('labo-loupe');
+  const video = $('labo-lecteur');
+  if (!toile || !video || !etat.loupe || !etat.cale || toile.clientWidth === 0) return;
+  const L = Math.round(toile.clientWidth * (window.devicePixelRatio || 1));
+  if (toile.width !== L) { toile.width = L; toile.height = L; }
+  const ctx = toile.getContext('2d');
+  ctx.fillStyle = couleur('--texte');
+  ctx.fillRect(0, 0, L, L);
+
+  // Image : la zone demandée, limitée aux bords de la vidéo
+  const { x0, y0, cote } = etat.loupe;
+  const k = video.videoWidth / etat.taille.l;   // pixels de traitement → pixels de la vidéo
+  const sx = x0 * k;
+  const sy = y0 * k;
+  const sc = cote * k;
+  const gx = Math.max(0, sx);
+  const gy = Math.max(0, sy);
+  const dx = Math.min(video.videoWidth, sx + sc);
+  const dy = Math.min(video.videoHeight, sy + sc);
+  const e = L / sc;
+  if (dx > gx && dy > gy) ctx.drawImage(video, gx, gy, dx - gx, dy - gy, (gx - sx) * e, (gy - sy) * e, (dx - gx) * e, (dy - gy) * e);
+
+  // Pour le diagnostic (et les tests) : zone et cadre en pixels de traitement
+  toile.dataset.zone = JSON.stringify(etat.loupe);
+  toile.dataset.cadre = JSON.stringify(etat.cale);
+
+  // Cadre : ellipse saumon, côtés bleus sur toute la loupe, poignées au milieu des côtés
+  const X = (x) => ((x - x0) / cote) * L;
+  const Y = (y) => ((y - y0) / cote) * L;
+  const { x, y, a, b } = etat.cale;
+  const ep = Math.max(2, L / 200);
+  ctx.lineWidth = ep;
+  ctx.strokeStyle = couleur('--saumon');
+  ctx.beginPath();
+  ctx.ellipse(X(x), Y(y), (b / cote) * L, (a / cote) * L, 0, 0, 2 * Math.PI);
+  ctx.stroke();
+
+  ctx.strokeStyle = couleur('--bleu');
+  ctx.lineWidth = ep * 0.8;
+  ctx.setLineDash([ep * 4, ep * 3]);
+  ctx.beginPath();
+  for (const u of [X(x - b), X(x + b)]) { ctx.moveTo(u, 0); ctx.lineTo(u, L); }
+  for (const v of [Y(y - a), Y(y + a)]) { ctx.moveTo(0, v); ctx.lineTo(L, v); }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  for (const [u, v] of [[X(x), Y(y - a)], [X(x), Y(y + a)], [X(x - b), Y(y)], [X(x + b), Y(y)]]) {
+    ctx.beginPath();
+    ctx.arc(u, v, ep * 4, 0, 2 * Math.PI);
+    ctx.fillStyle = couleur('--bleu');
+    ctx.fill();
+    ctx.lineWidth = ep;
+    ctx.strokeStyle = couleur('--carte');
+    ctx.stroke();
+  }
+  // Centre
+  ctx.strokeStyle = couleur('--saumon');
+  ctx.lineWidth = ep;
+  ctx.beginPath();
+  ctx.moveTo(X(x) - ep * 4, Y(y)); ctx.lineTo(X(x) + ep * 4, Y(y));
+  ctx.moveTo(X(x), Y(y) - ep * 4); ctx.lineTo(X(x), Y(y) + ep * 4);
+  ctx.stroke();
 }
 
 /* ==========================================================================
@@ -353,26 +565,18 @@ function dessiner(jusquA = null) {
   if (!dessin) return;
   const ctx = dessin.getContext('2d');
   ctx.clearRect(0, 0, dessin.width, dessin.height);
-  const epaisseur = Math.max(2, dessin.width / 160);
+  const epaisseur = Math.max(2, dessin.width / 120);
 
-  if (etat.cercle && !etat.analyse) {
+  if (etat.cale && !etat.analyse) {
     ctx.lineWidth = epaisseur;
-    ctx.strokeStyle = couleur('--bleu');
-    ctx.setLineDash([6, 6]);
+    ctx.strokeStyle = couleur('--saumon');
     ctx.beginPath();
-    ctx.arc(etat.cercle.x, etat.cercle.y, etat.cercle.D / 2, 0, 2 * Math.PI);
+    ctx.ellipse(etat.cale.x, etat.cale.y, etat.cale.b, etat.cale.a, 0, 0, 2 * Math.PI);
     ctx.stroke();
-    ctx.setLineDash([]);
-    if (etat.cale) {
-      ctx.strokeStyle = couleur('--saumon');
-      ctx.beginPath();
-      ctx.ellipse(etat.cale.x, etat.cale.y, etat.cale.b, etat.cale.a, 0, 0, 2 * Math.PI);
-      ctx.stroke();
-      ctx.fillStyle = couleur('--saumon');
-      ctx.beginPath();
-      ctx.arc(etat.cale.x, etat.cale.y, epaisseur * 1.5, 0, 2 * Math.PI);
-      ctx.fill();
-    }
+    ctx.fillStyle = couleur('--saumon');
+    ctx.beginPath();
+    ctx.arc(etat.cale.x, etat.cale.y, epaisseur * 1.5, 0, 2 * Math.PI);
+    ctx.fill();
   }
 
   // Trajectoire : bleu = descente, saumon = montée
@@ -399,12 +603,11 @@ async function analyser() {
   if (etat.enCours) return;
   const video = $('labo-lecteur');
   if (!etat.adresse) { afficherMessage('Choisissez d’abord une vidéo'); return; }
-  if (!etat.cercle) { afficherMessage('Touchez d’abord le centre du disque'); return; }
-  if (!etat.cale) recaler();
+  if (!etat.cale) { afficherMessage('Touchez d’abord le disque'); return; }
 
   const diametre = Number($('labo-diametre').value);
   const mode = $('labo-mode').value;
-  const debut = video.currentTime;   // l'image sur laquelle le cercle a été calé
+  const debut = video.currentTime;   // l'image sur laquelle le disque a été calé
   const numero = etat.numero;        // si la vidéo change ou si l'on quitte l'écran, on abandonne
   const abandonnee = () => etat.numero !== numero;
   etat.enCours = true;
@@ -413,10 +616,11 @@ async function analyser() {
   $('labo-analyser').hidden = true;
   $('labo-arreter').hidden = false;
   $('labo-resultats').hidden = true;
+  $('labo-reglage').hidden = true;
   $('labo-etat').textContent = 'Analyse en cours…';
   majActions();
 
-  const depart = etat.cale;
+  const depart = { ...etat.cale };
   const dessin = $('labo-dessin');
   const ctx = dessin.getContext('2d');
   try {
@@ -438,7 +642,7 @@ async function analyser() {
     if (abandonnee()) return;
     video.pause();
     const resultat = resultats(suivi, depart, diametre);
-    etat.analyse = { suivi, resultat, diametre, mode };
+    etat.analyse = { suivi, resultat, diametre, mode, depart };
     $('labo-etat').textContent = etat.arreter ? 'Analyse arrêtée.' : 'Analyse terminée.';
     afficherResultats();
     await allerA(video, debut);
@@ -515,6 +719,7 @@ function afficherResultats() {
           </table>
         </div>
         <p class="texte-secondaire">Vitesses en m/s. « Suivi » : netteté du bord du disque pendant la montée, comparée au reste de la vidéo (⚠︎ = à vérifier en revoyant la vidéo).</p>`}
+    ${angleDeVue(etat.analyse.depart) > 0 ? `<p class="texte-secondaire">Filmé de biais (environ ${angleDeVue(etat.analyse.depart)}°) : les vitesses restent justes, car c’est la hauteur du disque qui sert d’échelle${etat.cible ? ' ; le mouvement avant-arrière gardé avec la série est redressé' : ''}.</p>` : ''}
     ${resultat.interrompu !== null ? `<p class="texte-secondaire">Suivi arrêté à ${format(resultat.interrompu, 1)} s : le disque a quitté sa zone (barre reposée, sortie de l’image ou disque caché). Ce qui suit n’est pas compté.</p>` : ''}
     <button class="bouton bouton-secondaire bouton-large" type="button" data-action="labo-revoir">Revoir avec la trajectoire</button>
     ${htmlRemplir(reps, moyenne)}
@@ -524,7 +729,7 @@ function afficherResultats() {
         <li>Mode : ${modes[d.mode]}${d.cadence ? ` · cadence estimée ${d.cadence} i/s` : ''}</li>
         <li>Images analysées : ${d.images} (${Math.round(d.imagesParSeconde)} par seconde de vidéo) · images sautées : ${d.imagesSautees}</li>
         <li>Calcul : ${format(d.calculParImage, 1)} ms par image · analyse ${format(d.dureeAnalyse, 1)} s pour ${format(d.dureeVideo, 1)} s de vidéo</li>
-        <li>Image de travail : ${d.largeur} × ${d.hauteur} px · disque ${Math.round(2 * etat.cale.a)} px de haut pour ${format(diametre * 100, 1)} cm · ${format(resultat.metresParPixel * 1000, 2)} mm par pixel</li>
+        <li>Image de travail : ${d.largeur} × ${d.hauteur} px · disque ${Math.round(2 * etat.analyse.depart.a)} × ${Math.round(2 * etat.analyse.depart.b)} px (hauteur × largeur) pour ${format(diametre * 100, 1)} cm · ${format(resultat.metresParPixel * 1000, 2)} mm par pixel</li>
         <li>Navigateur : ${'requestVideoFrameCallback' in HTMLVideoElement.prototype ? 'lecture image par image disponible' : 'requestVideoFrameCallback absent'} · ${window.matchMedia('(display-mode: standalone)').matches ? 'app de l’écran d’accueil' : 'Safari'}</li>
       </ul>
     </details>
@@ -576,9 +781,13 @@ async function revoir() {
  * Ce qui est gardé avec la série : les reps et la trajectoire en chiffres
  * (environ 30 points par seconde, en mm depuis le premier point, y vers le haut).
  */
-function construireMesure(resultat, diametre, vitesse) {
+function construireMesure(resultat, diametre, vitesse, depart) {
   const arrondi = (valeur, decimales) => Math.round(valeur * 10 ** decimales) / 10 ** decimales;
   const tr = resultat.trajectoire;
+  // Filmé de biais : le mouvement avant-arrière apparaît écrasé comme la largeur du disque
+  // (rapport largeur/hauteur) ; on le redresse. La hauteur, elle, n'est pas touchée.
+  const angle = angleDeVue(depart);
+  const redressement = angle > 0 ? Math.min(2, depart.a / depart.b) : 1;
   const t0 = tr ? tr.t[0] : 0;
   let trajectoire = null;
   if (tr && tr.t.length > 1) {
@@ -588,7 +797,7 @@ function construireMesure(resultat, diametre, vitesse) {
     const x = [];
     const y = [];
     for (let i = 0; i < tr.t.length; i += saut) {
-      x.push(mm(tr.x[i] - tr.x[0]));
+      x.push(Math.round(mm(tr.x[i] - tr.x[0]) * redressement));
       y.push(mm(tr.y[0] - tr.y[i]));   // sur l'image, y descend : on le remet vers le haut
     }
     trajectoire = { pas: arrondi(saut * pas, 4), x, y };
@@ -596,6 +805,7 @@ function construireMesure(resultat, diametre, vitesse) {
   return {
     date: new Date().toISOString(),
     disque: diametre,
+    angle,
     vitesse,
     reps: resultat.reps.map((r) => ({
       vitesse: arrondi(r.vitesseMoyenne, 3),
@@ -614,10 +824,10 @@ function construireMesure(resultat, diametre, vitesse) {
 async function remplir() {
   const cible = etat.cible;
   if (!cible || !etat.analyse || etat.enCours) return;
-  const { resultat, diametre } = etat.analyse;
+  const { resultat, diametre, depart } = etat.analyse;
   const vitesse = vitesseDeLaSerie(resultat.reps);
   if (vitesse === null) return;
-  const mesure = construireMesure(resultat, diametre, vitesse);
+  const mesure = construireMesure(resultat, diametre, vitesse, depart);
   await modifierBloc(cible.bloc, (bloc) => {
     const { serie } = trouverSerie(bloc, cible.semaine, cible.jour, cible.exercice, cible.liste, cible.index);
     serie.vitesse = vitesse;
@@ -663,6 +873,8 @@ export const boutonsLabo = {
   'labo-analyser': analyser,
   'labo-arreter': arreter,
   'labo-revoir': revoir,
+  'labo-ajuster': ajusterAuBord,
+  'labo-valider': validerCadre,
   'vbt-remplir': remplir,
   'vbt-retour': retourSeance,
 };

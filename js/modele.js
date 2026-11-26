@@ -21,9 +21,10 @@
 //                 └─ series : [ Série réalisée ]   (séries de travail, une ligne par série)
 //                      ├─ charge, repetitions, rpe, vitesse (moyenne, m/s), faite
 //                      └─ vbt : mesure vidéo de la série (facultatif, aussi sur le last warm-up)
-//                               { date, disque (m), vitesse (m/s, celle mise dans la série),
+//                               { date, disque (m), angle (° de biais, 0 = de face), vitesse (m/s, celle mise dans la série),
 //                                 reps: [{ vitesse, max, amplitude (m), duree (s), debut, fin (s), douteuse }],
-//                                 trajectoire: { pas (s), x, y (mm, depuis le 1er point, y vers le haut) } }
+//                                 trajectoire: { pas (s), x, y (mm, depuis le 1er point, y vers le haut ;
+//                                                x redressé si filmé de biais) } }
 //                               La vidéo elle-même n'est jamais gardée.
 //
 // Unités : charges en kg, vitesses en m/s. Une valeur inconnue vaut null.
@@ -191,6 +192,7 @@ function normaliserMesureVbt(brute) {
   return {
     date: lireTexte(brute.date) || null,
     disque: nombre(brute.disque),
+    angle: nombre(brute.angle) ?? 0,
     vitesse: nombre(brute.vitesse),
     reps,
     trajectoire,
