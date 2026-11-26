@@ -5,10 +5,14 @@
    variables définies en haut de styles.css.
    ========================================================================== */
 
-/* La vidéo, avec la toile de dessin posée exactement par-dessus */
+/* La vidéo, avec la toile de dessin posée exactement par-dessus.
+   Elle est réduite à 45 % de la hauteur de l'écran (--ratio = largeur/hauteur de la
+   vidéo, posé au chargement) : les réglages restent visibles en même temps qu'elle. */
 .labo-cadre {
   position: relative;
   overflow: hidden;
+  width: min(100%, calc(45svh * var(--ratio, 0.5625)));
+  margin-inline: auto;
   border-radius: var(--arrondi-champ);
   background: var(--texte);
 }
@@ -57,4 +61,16 @@
 
 .table-labo tbody th {
   text-align: left;
+}
+
+/* Loupe du calage : la zone du disque agrandie, carrée, avec le cadre à 4 côtés.
+   touch-action: none : glisser un côté ne fait pas défiler la page. */
+.labo-loupe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--arrondi-champ);
+  background: var(--texte);
+  touch-action: none;
+  cursor: grab;
 }
