@@ -1,11 +1,18 @@
 // FA 4 IT — js/labo-vbt.js
-// L'écran « Labo VBT » (essai) : analyser une vidéo de série pour mesurer la
-// vitesse de barre et tracer la trajectoire. Ouvert depuis Sauvegarde › Application.
-// Il ne lit ni n'écrit AUCUNE donnée de l'app : la vidéo reste en mémoire le temps
-// de l'analyse, puis elle est libérée. Rien n'est envoyé sur internet.
+// Analyser une vidéo de série pour mesurer la vitesse de barre et tracer la trajectoire.
+// Deux écrans utilisent le même outil :
+//   #/labo  « Labo VBT » (essai), ouvert depuis Sauvegarde › Application :
+//           il ne lit ni n'écrit AUCUNE donnée de l'app.
+//   #/vbt/<bloc>/<semaine>/<jour>/<exercice>/<liste>/<numéro>
+//           « Mesurer en vidéo », ouvert depuis une série (ou le last warm-up) de la
+//           séance : après confirmation, la vitesse moyenne remplit la série et le
+//           détail de la mesure (reps, trajectoire en chiffres) est gardé avec elle.
+// Dans les deux cas, la vidéo reste en mémoire le temps de l'analyse, puis elle est
+// libérée : elle n'est jamais enregistrée ni envoyée sur internet.
 
 import { caler, suivre, resultats, champAutour, toileDeTravail, tailleDeTraitement, allerA } from './vbt-analyse.js';
-import { echapper, afficherMessage } from './ui.js';
+import { lireBloc, modifierBloc, lireReglage, ecrireReglage } from './db.js';
+import { echapper, afficherMessage, pluriel, formaterNombre } from './ui.js';
 
 const DISQUES = [
   { valeur: '0.45', libelle: '45 cm (20-25 kg ou bumper)' },
@@ -20,7 +27,13 @@ const MODES = [
   { valeur: 'ralenti', libelle: 'Lecture au ralenti ×0,25' },
 ];
 
-// État du labo (une seule vidéo à la fois)
+// Réglages retenus d'une fois sur l'autre (labo et mesure des séries)
+const REGLAGES = {
+  vbtDisque: { liste: DISQUES, defaut: '0.45' },
+  vbtMode: { liste: MODES, defaut: 'image' },
+};
+
+// État de l'outil (une seule vidéo à la fois)
 const etat = {
   adresse: null,      // adresse temporaire de la vidéo en mémoire (blob)
   taille: null,       // taille de traitement { l, h }
@@ -29,14 +42,88 @@ const etat = {
   analyse: null,      // résultat de suivre() + resultats()
   enCours: false,
   arreter: false,
+  numero: 0,          // change à chaque nouvelle vidéo ou sortie de l'écran : une analyse en cours s'arrête
+  cible: null,        // série à remplir (écran de mesure) : { bloc, semaine, jour, exercice, liste, index, repetitions }
 };
 
 /* ==========================================================================
-   1. L'écran
+   1. Les écrans
    ========================================================================== */
 
-function ecranLabo() {
+async function lireReglagesVbt() {
+  const lus = {};
+  for (const [cle, { liste, defaut }] of Object.entries(REGLAGES)) {
+    const valeur = await lireReglage(cle, defaut);
+    lus[cle] = liste.some((choix) => choix.valeur === valeur) ? valeur : defaut;
+  }
+  return lus;
+}
+
+/** Bouton pour choisir ou filmer la vidéo (avec le champ fichier caché). */
+function boutonVideo() {
+  return `
+    <button class="bouton bouton-large" type="button" data-action="labo-choisir">Choisir ou filmer une vidéo</button>
+    <input id="labo-fichier" type="file" accept="video/*" data-changement="labo-video" hidden>
+  `;
+}
+
+/** Vidéo, réglages, Analyser, puis résultats : commun au labo et à la mesure d'une série. */
+function htmlOutil(reglages) {
+  const options = (liste, choisie) => liste
+    .map((choix) => `<option value="${choix.valeur}"${choix.valeur === choisie ? ' selected' : ''}>${echapper(choix.libelle)}</option>`)
+    .join('');
+  return `
+    <section class="carte" id="labo-zone" hidden>
+      <div class="labo-cadre">
+        <video id="labo-lecteur" playsinline muted preload="auto"></video>
+        <canvas id="labo-dessin" class="labo-dessin"></canvas>
+      </div>
+      <p id="labo-infos" class="texte-secondaire"></p>
+
+      <div class="groupe">
+        <label class="etiquette" for="labo-temps">1. Placez la vidéo juste avant la première rep</label>
+        <input id="labo-temps" class="labo-curseur" type="range" min="0" max="1" step="0.01" value="0">
+        <span id="labo-temps-texte" class="texte-secondaire">0,00 s</span>
+      </div>
+
+      <p class="etiquette">2. Touchez le centre du disque sur l’image</p>
+
+      <div class="groupe">
+        <label class="etiquette" for="labo-taille">3. Ajustez le cercle au bord du disque</label>
+        <input id="labo-taille" class="labo-curseur" type="range" min="30" max="400" step="1" value="150">
+        <span id="labo-cale" class="texte-secondaire">Touchez d’abord le disque.</span>
+      </div>
+
+      <div class="groupe">
+        <label class="etiquette" for="labo-diametre">4. Disque visible</label>
+        <div class="choix">
+          <select id="labo-diametre" class="champ" data-changement="vbt-reglage" data-reglage="vbtDisque">
+            ${options(DISQUES, reglages.vbtDisque)}
+          </select>
+        </div>
+      </div>
+
+      <div class="groupe">
+        <label class="etiquette" for="labo-mode">Lecture pendant l’analyse</label>
+        <div class="choix">
+          <select id="labo-mode" class="champ" data-changement="vbt-reglage" data-reglage="vbtMode">
+            ${options(MODES, reglages.vbtMode)}
+          </select>
+        </div>
+      </div>
+
+      <button class="bouton bouton-large" type="button" data-action="labo-analyser" id="labo-analyser">Analyser</button>
+      <button class="bouton bouton-secondaire bouton-large" type="button" data-action="labo-arreter" id="labo-arreter" hidden>Arrêter</button>
+      <p id="labo-etat" class="texte-secondaire" aria-live="polite"></p>
+    </section>
+
+    <section class="carte" id="labo-resultats" hidden></section>
+  `;
+}
+
+async function ecranLabo() {
   liberer();
+  const reglages = await lireReglagesVbt();
   return {
     titre: 'Labo VBT',
     html: `
@@ -44,69 +131,96 @@ function ecranLabo() {
         <h2>Essai de la VBT vidéo</h2>
         <p class="texte-secondaire">Filmez une série ou choisissez une vidéo : l’app suit le disque au bout de la barre et calcule la vitesse de chaque rep. La vidéo n’est ni enregistrée ni envoyée, et vos données ne sont pas touchées.</p>
         <p class="texte-secondaire">Pour un bon résultat : téléphone fixe (trépied), face au bout de la barre, disque entier visible du début à la fin.</p>
-        <button class="bouton bouton-large" type="button" data-action="labo-choisir">Choisir ou filmer une vidéo</button>
-        <input id="labo-fichier" type="file" accept="video/*" data-changement="labo-video" hidden>
+        ${boutonVideo()}
       </section>
-
-      <section class="carte" id="labo-zone" hidden>
-        <div class="labo-cadre">
-          <video id="labo-lecteur" playsinline muted preload="auto"></video>
-          <canvas id="labo-dessin" class="labo-dessin"></canvas>
-        </div>
-        <p id="labo-infos" class="texte-secondaire"></p>
-
-        <div class="groupe">
-          <label class="etiquette" for="labo-temps">1. Placez la vidéo juste avant la première rep</label>
-          <input id="labo-temps" class="labo-curseur" type="range" min="0" max="1" step="0.01" value="0">
-          <span id="labo-temps-texte" class="texte-secondaire">0,00 s</span>
-        </div>
-
-        <p class="etiquette">2. Touchez le centre du disque sur l’image</p>
-
-        <div class="groupe">
-          <label class="etiquette" for="labo-taille">3. Ajustez le cercle au bord du disque</label>
-          <input id="labo-taille" class="labo-curseur" type="range" min="30" max="400" step="1" value="150">
-          <span id="labo-cale" class="texte-secondaire">Touchez d’abord le disque.</span>
-        </div>
-
-        <div class="groupe">
-          <label class="etiquette" for="labo-diametre">4. Disque visible</label>
-          <div class="choix">
-            <select id="labo-diametre" class="champ">
-              ${DISQUES.map((d) => `<option value="${d.valeur}">${echapper(d.libelle)}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-
-        <div class="groupe">
-          <label class="etiquette" for="labo-mode">Lecture pendant l’analyse</label>
-          <div class="choix">
-            <select id="labo-mode" class="champ">
-              ${MODES.map((m) => `<option value="${m.valeur}">${echapper(m.libelle)}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-
-        <button class="bouton bouton-large" type="button" data-action="labo-analyser" id="labo-analyser">Analyser</button>
-        <button class="bouton bouton-secondaire bouton-large" type="button" data-action="labo-arreter" id="labo-arreter" hidden>Arrêter</button>
-        <p id="labo-etat" class="texte-secondaire" aria-live="polite"></p>
-      </section>
-
-      <section class="carte" id="labo-resultats" hidden></section>
+      ${htmlOutil(reglages)}
     `,
     actions: '<a class="bouton bouton-secondaire bouton-retour" href="#/sauvegarde">Retour</a>',
   };
 }
 
-// En quittant le labo, on libère la vidéo de la mémoire
+/** Retrouve la série visée par l'adresse (ou lance une erreur claire). */
+function trouverSerie(bloc, idSemaine, idJour, idExercice, liste, index) {
+  const semaine = bloc.semaines.find((s) => s.id === idSemaine);
+  const jour = semaine?.jours.find((j) => j.id === idJour);
+  const exercice = jour?.exercices.find((e) => e.id === idExercice);
+  const lignes = liste === 'echauffement' ? exercice?.echauffement : exercice?.series;
+  const serie = lignes?.[index];
+  if (!serie) throw new Error('Cette série n’existe plus.');
+  return { jour, exercice, lignes, serie };
+}
+
+/** « Série 2 », « Last warm-up » ou « Palier 3 ». */
+function nomDeLaLigne(liste, index, lignes) {
+  if (liste === 'series') return `Série ${index + 1}`;
+  return index === lignes.length - 1 ? 'Last warm-up' : `Palier ${index + 1}`;
+}
+
+/** Écran « Mesurer en vidéo » d'une série : #/vbt/<bloc>/<semaine>/<jour>/<exercice>/<liste>/<numéro> */
+async function ecranMesure([idBloc, idSemaine, idJour, idExercice, liste = 'series', numero = '0']) {
+  liberer();
+  const bloc = await lireBloc(idBloc);
+  if (!bloc) throw new Error('Ce bloc n’existe plus.');
+  const index = Number(numero);
+  const { jour, exercice, lignes, serie } = trouverSerie(bloc, idSemaine, idJour, idExercice, liste, index);
+  const reglages = await lireReglagesVbt();
+  etat.cible = { bloc: idBloc, semaine: idSemaine, jour: idJour, exercice: idExercice, liste, index, repetitions: serie.repetitions };
+
+  const nom = nomDeLaLigne(liste, index, lignes);
+  const ancienne = serie.vbt
+    ? `<p class="texte-secondaire">Déjà mesurée : ${serie.vbt.vitesse !== null ? `${format(serie.vbt.vitesse)} m/s` : '?'} sur ${pluriel(serie.vbt.reps.length, 'rep')}. Une nouvelle mesure remplacera l’ancienne.</p>`
+    : '';
+  return {
+    titre: exercice.nom,
+    html: `
+      <section class="carte">
+        <h2>Mesurer en vidéo · ${echapper(nom)}</h2>
+        <p class="texte-secondaire">${echapper(jour.nom)} · ${formaterNombre(serie.charge) || '?'} kg × ${formaterNombre(serie.repetitions) || '?'}</p>
+        ${ancienne}
+        <p class="texte-secondaire">Téléphone fixe, face au bout de la barre et à sa hauteur, disque entier visible (1080p à 60 i/s conseillé). La vidéo n’est ni gardée ni envoyée : seuls les chiffres le sont, et seulement si vous remplissez la série.</p>
+        ${boutonVideo()}
+      </section>
+      ${htmlOutil(reglages)}
+    `,
+    actions: actionsMesure(),
+  };
+}
+
+/** Boutons du bas de l'écran de mesure : retour, et « Remplir » une fois la vitesse connue. */
+function actionsMesure(vitesse = null) {
+  const retour = '<button class="bouton bouton-secondaire bouton-retour" type="button" data-action="vbt-retour">‹ Séance</button>';
+  return vitesse === null ? retour : `${retour}<button class="bouton" type="button" data-action="vbt-remplir">Remplir : ${format(vitesse)} m/s</button>`;
+}
+
+/** Met à jour les boutons du bas (écran de mesure seulement). */
+function majActions(vitesse = null) {
+  const zone = document.getElementById('actions');
+  if (etat.cible && zone) zone.innerHTML = actionsMesure(vitesse);
+}
+
+// En quittant ces écrans, on libère la vidéo de la mémoire (une analyse en cours s'arrête)
 window.addEventListener('hashchange', () => {
-  if (!location.hash.startsWith('#/labo')) liberer();
+  if (!location.hash.startsWith('#/labo') && !location.hash.startsWith('#/vbt/')) liberer();
 });
 
-/** Libère la vidéo précédente (mémoire). */
-function liberer() {
+/** Oublie la vidéo en cours (mémoire) et arrête une analyse en cours ; garde la série visée. */
+function oublierVideo() {
+  etat.numero += 1;
+  etat.arreter = true;
   if (etat.adresse) URL.revokeObjectURL(etat.adresse);
-  Object.assign(etat, { adresse: null, taille: null, cercle: null, cale: null, analyse: null, enCours: false, arreter: false });
+  Object.assign(etat, { adresse: null, taille: null, cercle: null, cale: null, analyse: null, enCours: false });
+}
+
+/** Comme oublierVideo, et oublie aussi la série visée (sortie de l'écran). */
+function liberer() {
+  oublierVideo();
+  etat.cible = null;
+}
+
+/** Réglage (disque, mode) changé : retenu pour la prochaine fois. */
+async function enregistrerReglageVbt(champ) {
+  const cle = champ.dataset.reglage;
+  if (Object.hasOwn(REGLAGES, cle)) await ecrireReglage(cle, champ.value);
 }
 
 const $ = (id) => document.getElementById(id);
@@ -127,7 +241,10 @@ async function chargerVideo(champ) {
   const fichier = champ.files?.[0];
   champ.value = '';   // pour pouvoir rechoisir la même vidéo
   if (!fichier) return;
-  liberer();
+  oublierVideo();   // arrête aussi une analyse en cours sur la vidéo précédente
+  $('labo-analyser').hidden = false;
+  $('labo-arreter').hidden = true;
+  majActions();
   const video = $('labo-lecteur');
   etat.adresse = URL.createObjectURL(fichier);
   video.src = etat.adresse;
@@ -288,6 +405,8 @@ async function analyser() {
   const diametre = Number($('labo-diametre').value);
   const mode = $('labo-mode').value;
   const debut = video.currentTime;   // l'image sur laquelle le cercle a été calé
+  const numero = etat.numero;        // si la vidéo change ou si l'on quitte l'écran, on abandonne
+  const abandonnee = () => etat.numero !== numero;
   etat.enCours = true;
   etat.arreter = false;
   etat.analyse = null;
@@ -295,6 +414,7 @@ async function analyser() {
   $('labo-arreter').hidden = false;
   $('labo-resultats').hidden = true;
   $('labo-etat').textContent = 'Analyse en cours…';
+  majActions();
 
   const depart = etat.cale;
   const dessin = $('labo-dessin');
@@ -303,7 +423,7 @@ async function analyser() {
     const suivi = await suivre(video, depart, {
       mode,
       debut,
-      arret: () => etat.arreter,
+      arret: () => etat.arreter || abandonnee(),
       surImage: ({ x, y, nombre, temps }) => {
         // Suivi en direct : le contour calé suit le disque
         ctx.clearRect(0, 0, dessin.width, dessin.height);
@@ -315,17 +435,20 @@ async function analyser() {
         if (nombre % 10 === 0) $('labo-etat').textContent = `Analyse en cours… ${format(temps, 1)} s / ${format(video.duration, 1)} s`;
       },
     });
+    if (abandonnee()) return;
     video.pause();
     const resultat = resultats(suivi, depart, diametre);
-    etat.analyse = { suivi, resultat, diametre };
+    etat.analyse = { suivi, resultat, diametre, mode };
     $('labo-etat').textContent = etat.arreter ? 'Analyse arrêtée.' : 'Analyse terminée.';
     afficherResultats();
     await allerA(video, debut);
-    dessiner();
+    if (!abandonnee()) dessiner();
   } finally {
-    etat.enCours = false;
-    $('labo-analyser').hidden = false;
-    $('labo-arreter').hidden = true;
+    if (!abandonnee()) {
+      etat.enCours = false;
+      $('labo-analyser').hidden = false;
+      $('labo-arreter').hidden = true;
+    }
   }
 }
 
@@ -337,13 +460,35 @@ function arreter() {
    6. Résultats et diagnostic
    ========================================================================== */
 
+/** Moyenne des vitesses moyennes des reps sûres (sans ⚠︎), arrondie au centième, ou null. */
+function vitesseDeLaSerie(reps) {
+  const fiables = reps.filter((r) => !r.douteuse);
+  if (fiables.length === 0) return null;
+  return Math.round((fiables.reduce((somme, r) => somme + r.vitesseMoyenne, 0) / fiables.length) * 100) / 100;
+}
+
+/** Écran de mesure : avertissement sur le nombre de reps et rappel du bouton « Remplir » (en bas). */
+function htmlRemplir(reps, moyenne) {
+  const cible = etat.cible;
+  if (!cible || reps.length === 0) return '';
+  const notees = cible.repetitions;
+  const avertissement = notees !== null && notees !== undefined && reps.length !== notees
+    ? `<p class="alerte">⚠︎ ${pluriel(reps.length, 'rep trouvée', 'reps trouvées')} pour ${pluriel(notees, 'notée', 'notées')} dans la série. Revoyez la vidéo avant de remplir : les répétitions ne seront pas modifiées.</p>`
+    : '';
+  const quoi = cible.liste === 'series' ? 'la série' : 'le last warm-up';
+  const suite = moyenne !== null
+    ? `<p class="texte-secondaire">Pour mettre ${format(moyenne)} m/s dans ${quoi}, touchez « Remplir » en bas de l’écran. Le détail des reps et la trajectoire sont gardés avec, pas la vidéo.</p>`
+    : '<p class="alerte">Toutes les reps sont à vérifier (⚠︎) : rien à remplir. Recommencez avec le disque bien visible.</p>';
+  return `${avertissement}${suite}`;
+}
+
 function afficherResultats() {
   const { suivi, resultat, diametre } = etat.analyse;
   const reps = resultat.reps;
   const zone = $('labo-resultats');
   const d = suivi.diagnostic;
-  const fiables = reps.filter((r) => !r.douteuse);
-  const moyenne = fiables.length ? fiables.reduce((s, r) => s + r.vitesseMoyenne, 0) / fiables.length : null;
+  const moyenne = vitesseDeLaSerie(reps);
+  const avecDouteuses = reps.some((r) => r.douteuse);
 
   const lignes = reps.map((r, i) => `
     <tr>
@@ -362,7 +507,7 @@ function afficherResultats() {
       ? '<p class="alerte">Aucune rep trouvée. Vérifiez que le disque est bien suivi en revoyant la vidéo, ou placez le départ plus tôt.</p>'
       : `
         <p>Vitesse moyenne de la série : <strong>${moyenne !== null ? `${format(moyenne)} m/s` : '—'}</strong>
-          <span class="texte-secondaire">(moyenne des reps ; c’est la valeur qui irait dans la série)</span></p>
+          <span class="texte-secondaire">(moyenne des reps${avecDouteuses ? ' sans ⚠︎' : ''} ; c’est la valeur qui ${etat.cible ? 'ira' : 'irait'} dans la série)</span></p>
         <div class="tableau-defilant">
           <table class="table-labo">
             <thead><tr><th scope="col">Rep</th><th scope="col">Moy.</th><th scope="col">Max</th><th scope="col">Ampl.</th><th scope="col">Durée</th><th scope="col">Suivi</th></tr></thead>
@@ -372,6 +517,7 @@ function afficherResultats() {
         <p class="texte-secondaire">Vitesses en m/s. « Suivi » : netteté du bord du disque pendant la montée, comparée au reste de la vidéo (⚠︎ = à vérifier en revoyant la vidéo).</p>`}
     ${resultat.interrompu !== null ? `<p class="texte-secondaire">Suivi arrêté à ${format(resultat.interrompu, 1)} s : le disque a quitté sa zone (barre reposée, sortie de l’image ou disque caché). Ce qui suit n’est pas compté.</p>` : ''}
     <button class="bouton bouton-secondaire bouton-large" type="button" data-action="labo-revoir">Revoir avec la trajectoire</button>
+    ${htmlRemplir(reps, moyenne)}
     <details class="details">
       <summary>Diagnostic (pour Claude)</summary>
       <ul class="liste-vitesses">
@@ -384,6 +530,7 @@ function afficherResultats() {
     </details>
   `;
   zone.hidden = false;
+  majActions(reps.length > 0 ? moyenne : null);
 }
 
 /**
@@ -422,11 +569,93 @@ async function revoir() {
 }
 
 /* ==========================================================================
-   7. Ce que app.js utilise
+   7. Remplir la série (écran de mesure seulement)
+   ========================================================================== */
+
+/**
+ * Ce qui est gardé avec la série : les reps et la trajectoire en chiffres
+ * (environ 30 points par seconde, en mm depuis le premier point, y vers le haut).
+ */
+function construireMesure(resultat, diametre, vitesse) {
+  const arrondi = (valeur, decimales) => Math.round(valeur * 10 ** decimales) / 10 ** decimales;
+  const tr = resultat.trajectoire;
+  const t0 = tr ? tr.t[0] : 0;
+  let trajectoire = null;
+  if (tr && tr.t.length > 1) {
+    const pas = (tr.t.at(-1) - t0) / (tr.t.length - 1);
+    const saut = Math.max(1, Math.round(1 / 30 / pas));
+    const mm = (pixels) => Math.round(pixels * resultat.metresParPixel * 1000);
+    const x = [];
+    const y = [];
+    for (let i = 0; i < tr.t.length; i += saut) {
+      x.push(mm(tr.x[i] - tr.x[0]));
+      y.push(mm(tr.y[0] - tr.y[i]));   // sur l'image, y descend : on le remet vers le haut
+    }
+    trajectoire = { pas: arrondi(saut * pas, 4), x, y };
+  }
+  return {
+    date: new Date().toISOString(),
+    disque: diametre,
+    vitesse,
+    reps: resultat.reps.map((r) => ({
+      vitesse: arrondi(r.vitesseMoyenne, 3),
+      max: arrondi(r.vitesseMax, 3),
+      amplitude: arrondi(r.amplitude, 3),
+      duree: arrondi(r.duree, 2),
+      debut: arrondi(r.debut - t0, 2),
+      fin: arrondi(r.fin - t0, 2),
+      douteuse: r.douteuse,
+    })),
+    trajectoire,
+  };
+}
+
+/** « Remplir la série » : vitesse moyenne dans le champ, détail gardé avec la série, retour à la séance. */
+async function remplir() {
+  const cible = etat.cible;
+  if (!cible || !etat.analyse || etat.enCours) return;
+  const { resultat, diametre } = etat.analyse;
+  const vitesse = vitesseDeLaSerie(resultat.reps);
+  if (vitesse === null) return;
+  const mesure = construireMesure(resultat, diametre, vitesse);
+  await modifierBloc(cible.bloc, (bloc) => {
+    const { serie } = trouverSerie(bloc, cible.semaine, cible.jour, cible.exercice, cible.liste, cible.index);
+    serie.vitesse = vitesse;
+    serie.vbt = mesure;
+  });
+  afficherMessage(`Vitesse enregistrée : ${format(vitesse)} m/s`);
+  await retourSeance();
+}
+
+/** Retour à la séance, sur la ligne mesurée. */
+async function retourSeance() {
+  const cible = etat.cible;
+  if (!cible) {
+    location.hash = '#/seance';
+    return;
+  }
+  // Même identifiant que la ligne dans seance.js
+  const idCible = `${cible.liste === 'series' ? 'serie' : 'echauffement'}-${cible.exercice}-${cible.index}`;
+  location.hash = `#/seance/${cible.bloc}/${cible.semaine}/${cible.jour}`;
+  // L'écran de séance se dessine juste après : on attend la ligne, puis on l'amène au centre.
+  for (let essai = 0; essai < 60; essai += 1) {
+    await new Promise((resoudre) => setTimeout(resoudre, 50));
+    const ligne = document.getElementById(idCible);
+    if (ligne) {
+      ligne.closest('details')?.setAttribute('open', '');   // échauffement replié
+      ligne.scrollIntoView({ block: 'center' });
+      return;
+    }
+  }
+}
+
+/* ==========================================================================
+   8. Ce que app.js utilise
    ========================================================================== */
 
 export const ecransLabo = {
   labo: { onglet: 'sauvegarde', afficher: ecranLabo },
+  vbt: { onglet: 'seance', afficher: ecranMesure },
 };
 
 export const boutonsLabo = {
@@ -434,8 +663,11 @@ export const boutonsLabo = {
   'labo-analyser': analyser,
   'labo-arreter': arreter,
   'labo-revoir': revoir,
+  'vbt-remplir': remplir,
+  'vbt-retour': retourSeance,
 };
 
 export const changementsLabo = {
   'labo-video': chargerVideo,
+  'vbt-reglage': enregistrerReglageVbt,
 };

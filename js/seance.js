@@ -99,16 +99,51 @@ function avancement(jour) {
   return { faites, total };
 }
 
-/** Les alertes d'une série : charge max dépassée, RPE au-dessus de la cible. */
-function alertesSerie(serie, prescription) {
+/** Les alertes d'une série : charge max dépassée, RPE au-dessus de la cible, reps de la vidéo ≠ reps notées. */
+function alertesSerie(serie, prescription, liste = 'series') {
   const messages = [];
-  if (aUneValeur(serie.charge) && aUneValeur(prescription.chargeMax) && serie.charge > prescription.chargeMax) {
+  // Charge et RPE : séries de travail seulement (un échauffement n'a pas de cible)
+  if (liste === 'series' && aUneValeur(serie.charge) && aUneValeur(prescription.chargeMax) && serie.charge > prescription.chargeMax) {
     messages.push(`Charge max dépassée (${formaterNombre(serie.charge)} kg > ${formaterNombre(prescription.chargeMax)} kg)`);
   }
-  if (aUneValeur(serie.rpe) && aUneValeur(prescription.rpeCible) && serie.rpe > prescription.rpeCible) {
+  if (liste === 'series' && aUneValeur(serie.rpe) && aUneValeur(prescription.rpeCible) && serie.rpe > prescription.rpeCible) {
     messages.push(`RPE au-dessus de la cible (${formaterNombre(serie.rpe)} > ${formaterNombre(prescription.rpeCible)})`);
   }
+  // Mesure vidéo : un nombre de reps différent de celui noté est signalé, jamais corrigé
+  const trouvees = serie.vbt?.reps?.length;
+  if (trouvees && aUneValeur(serie.repetitions) && trouvees !== serie.repetitions) {
+    messages.push(`Vidéo : ${pluriel(trouvees, 'rep trouvée', 'reps trouvées')} pour ${pluriel(serie.repetitions, 'notée', 'notées')}`);
+  }
   return messages;
+}
+
+/** Vitesse en m/s, toujours avec 2 décimales : 0,5 → « 0,50 ». */
+function formaterVitesse(valeur) {
+  return valeur.toFixed(2).replace('.', ',');
+}
+
+/**
+ * Squat, Bench, Deadlift (variantes comprises) : bouton « Mesurer en vidéo » et,
+ * si la série a déjà été mesurée, le résumé de la mesure.
+ */
+function zoneVideo(ids, exercice, serie, index, liste = 'series') {
+  if (exercice.mouvement === 'autre') return '';
+  const adresse = `#/vbt/${ids.bloc}/${ids.semaine}/${ids.jour}/${ids.exercice}/${liste}/${index}`;
+  const mesure = serie.vbt;
+  let resume = '';
+  if (mesure && mesure.reps.length > 0) {
+    const vitesses = mesure.reps.map((rep) => rep.vitesse);
+    const plage = vitesses.length > 1
+      ? `de ${formaterVitesse(Math.min(...vitesses))} à ${formaterVitesse(Math.max(...vitesses))} m/s`
+      : `${formaterVitesse(vitesses[0])} m/s`;
+    resume = `<span class="texte-secondaire">Vidéo : ${pluriel(mesure.reps.length, 'rep')}, ${plage}</span>`;
+  }
+  return `
+    <div class="serie-vbt">
+      <a class="bouton bouton-secondaire bouton-petit" href="${echapper(adresse)}">${mesure ? 'Remesurer en vidéo' : 'Mesurer en vidéo'}</a>
+      ${resume}
+    </div>
+  `;
 }
 
 /** « 4 × 5 @ RPE 7 · max 112,5 kg » */
@@ -270,6 +305,7 @@ function ligneSerie(ids, exercice, serie, index) {
         ${champPasAPas({ ids, index, champ: 'rpe', etiquette: 'RPE', valeur: serie.rpe, depart: prescription.rpeCible ?? 8, enAlerte: rpeEnAlerte })}
         ${champSimple({ ids, index, champ: 'vitesse', etiquette: 'Vitesse moy. (m/s)', valeur: serie.vitesse, indice: 'm/s' })}
       </div>
+      ${zoneVideo(ids, exercice, serie, index)}
       <p class="alerte serie-alerte" role="status"${alertes.length > 0 ? '' : ' hidden'}>${alertes.length > 0 ? `⚠︎ ${alertes.join(' · ')}` : ''}</p>
     </div>
   `;
@@ -297,6 +333,7 @@ function ligneEchauffement(ids, exercice, serie, index, total) {
     `;
   }
 
+  const alertes = alertesSerie(serie, exercice.prescription, liste);
   return `
     <div class="serie serie-echauffement${serie.faite ? ' faite' : ''}" id="${idHtml}">
       <div class="serie-entete">
@@ -309,6 +346,8 @@ function ligneEchauffement(ids, exercice, serie, index, total) {
         ${champPasAPas({ ids, index, liste, champ: 'rpe', etiquette: 'RPE', valeur: serie.rpe, depart: 6 })}
         ${champSimple({ ids, index, liste, champ: 'vitesse', etiquette: 'Vitesse moy. (m/s)', valeur: serie.vitesse, indice: 'm/s' })}
       </div>
+      ${zoneVideo(ids, exercice, serie, index, liste)}
+      <p class="alerte serie-alerte" role="status"${alertes.length > 0 ? '' : ' hidden'}>${alertes.length > 0 ? `⚠︎ ${alertes.join(' · ')}` : ''}</p>
     </div>
   `;
 }
@@ -437,10 +476,10 @@ function actualiserLigne(idExercice, index, serie, prescription, source = null, 
     }
   }
 
-  // Alertes (séries de travail seulement : un échauffement n'a pas de cible)
+  // Alertes (charge et RPE pour les séries de travail ; nombre de reps de la vidéo partout)
   const zone = ligne.querySelector('.serie-alerte');
   if (zone) {
-    const alertes = alertesSerie(serie, prescription);
+    const alertes = alertesSerie(serie, prescription, liste);
     ligne.querySelector('input[data-champ="charge"]')?.classList.toggle('en-alerte', alertes.some((m) => m.startsWith('Charge')));
     ligne.querySelector('input[data-champ="rpe"]')?.classList.toggle('en-alerte', alertes.some((m) => m.startsWith('RPE')));
     zone.hidden = alertes.length === 0;

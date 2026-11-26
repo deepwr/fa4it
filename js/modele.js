@@ -19,7 +19,12 @@
 //                 ├─ origine : case de la ligne dans le Sheets du coach (si importé), sinon null
 //                 │            { ligne, colonnes: { rpe, vitesse, charge }, controle: [{ colonne, texte }] }
 //                 └─ series : [ Série réalisée ]   (séries de travail, une ligne par série)
-//                      └─ charge, repetitions, rpe, vitesse (moyenne, m/s), faite
+//                      ├─ charge, repetitions, rpe, vitesse (moyenne, m/s), faite
+//                      └─ vbt : mesure vidéo de la série (facultatif, aussi sur le last warm-up)
+//                               { date, disque (m), vitesse (m/s, celle mise dans la série),
+//                                 reps: [{ vitesse, max, amplitude (m), duree (s), debut, fin (s), douteuse }],
+//                                 trajectoire: { pas (s), x, y (mm, depuis le 1er point, y vers le haut) } }
+//                               La vidéo elle-même n'est jamais gardée.
 //
 // Unités : charges en kg, vitesses en m/s. Une valeur inconnue vaut null.
 
@@ -148,12 +153,47 @@ export function nouvelleSerie(repetitions = null) {
    -------------------------------------------------------------------------- */
 
 function normaliserSerie(brute) {
-  return {
+  const serie = {
     charge: lireNombre(brute?.charge),
     repetitions: lireNombre(brute?.repetitions),
     rpe: lireNombre(brute?.rpe),
     vitesse: lireNombre(brute?.vitesse),
     faite: brute?.faite === true,
+  };
+  const mesure = normaliserMesureVbt(brute?.vbt);
+  if (mesure) serie.vbt = mesure;
+  return serie;
+}
+
+/** Mesure vidéo d'une série (voir le schéma en haut), ou null si absente ou illisible. */
+function normaliserMesureVbt(brute) {
+  if (!brute || typeof brute !== 'object' || !Array.isArray(brute.reps)) return null;
+  const nombre = (valeur) => (typeof valeur === 'number' && Number.isFinite(valeur) ? valeur : null);
+  const reps = brute.reps.slice(0, 50)
+    .map((rep) => ({
+      vitesse: nombre(rep?.vitesse),
+      max: nombre(rep?.max),
+      amplitude: nombre(rep?.amplitude),
+      duree: nombre(rep?.duree),
+      debut: nombre(rep?.debut),
+      fin: nombre(rep?.fin),
+      douteuse: rep?.douteuse === true,
+    }))
+    .filter((rep) => rep.vitesse !== null);
+  const points = (liste) => (Array.isArray(liste) ? liste.slice(0, 20000).map((v) => nombre(v) ?? 0) : []);
+  const trace = brute.trajectoire;
+  let trajectoire = null;
+  if (trace && nombre(trace.pas) > 0) {
+    const x = points(trace.x);
+    const y = points(trace.y);
+    if (x.length > 0 && x.length === y.length) trajectoire = { pas: trace.pas, x, y };
+  }
+  return {
+    date: lireTexte(brute.date) || null,
+    disque: nombre(brute.disque),
+    vitesse: nombre(brute.vitesse),
+    reps,
+    trajectoire,
   };
 }
 
