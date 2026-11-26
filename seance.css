@@ -230,3 +230,23 @@
 .serie-alerte {
   margin: 0;
 }
+
+/* --------------------------------------------------------------------------
+   Mesure vidéo d'une série : bouton « Mesurer en vidéo » et résumé
+   -------------------------------------------------------------------------- */
+
+.serie-vbt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espace-xs) var(--espace-m);
+}
+
+.serie-vbt .texte-secondaire {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sur une série faite (fond bleu clair), le bouton passe en blanc */
+.serie.faite .serie-vbt .bouton-secondaire {
+  background: var(--carte);
+}
