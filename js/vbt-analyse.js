@@ -4,10 +4,12 @@
 // Tout se passe sur le téléphone : la vidéo n'est ni enregistrée ni envoyée.
 //
 // Méthode (mise au point sur vos vidéos au banc d'essai, ≈ 0,02 m/s d'écart avec Qwik VBT) :
-//   1. On cale une ellipse sur le BORD du disque, à partir du cercle placé par vous.
-//   2. Image après image, on cherche où se trouve ce bord : c'est l'endroit où la
-//      « marche » de luminosité (le gradient) le long de l'ellipse est la plus forte.
-//   3. Échelle : diamètre réel du disque ÷ diamètre en pixels.
+//   1. On cale une ellipse sur le BORD du disque, à partir du cadre réglé par vous.
+//   2. Image après image (v14) : on retrouve d'abord la FACE du disque (son image,
+//      qui ne ressemble ni à un genou ni à une cuisse), puis on affine sur son bord,
+//      là où la « marche » de luminosité (le gradient) le long de l'ellipse est la
+//      plus forte. Si la face est méconnaissable, on se fie au bord seul.
+//   3. Échelle : hauteur réelle du disque ÷ hauteur en pixels (juste aussi de biais).
 //   4. La hauteur est lissée (filtre de Butterworth, 4 Hz), puis on repère chaque montée.
 
 /* ==========================================================================
@@ -20,6 +22,15 @@ export const REGLAGES_VBT = {
   partGardee: 0.7,            // on garde les 70 % de points au bord le plus net (mains, reflets…)
   visibiliteMin: 0.5,         // au moins la moitié du contour doit être dans l'image
   recherche: 14,              // on cherche le disque à ± 14 pixels de la position prévue
+  anneauFace: [0.3, 0.85],    // partie de la face retenue comme modèle (fraction du rayon)
+  rechercheFace: 0.25,        // la face du disque est cherchée à ± 25 % du rayon en hauteur (v14)…
+  rechercheFaceCote: 0.12,    // …et à ± 12 % sur le côté (la barre bouge surtout verticalement)
+  ressemblanceMin: 0.45,      // face reconnue au-dessus de 0,45 de ressemblance
+  ecartRessemblance: 0.1,     // on se recale sur la face si elle ressemble à 0,1 de plus que l'endroit du bord
+  ressemblanceMaj: 0.6,       // le modèle se met à jour si la face ressemble à plus de 0,6…
+  ressemblanceDepart: 0.4,    // …et encore à plus de 0,4 à celle du départ
+  poidsMaj: 0.1,              // part de l'image actuelle mélangée au modèle
+  faceSure: 0.85,             // face reconnue sans doute à plus de 0,85 : elle peut corriger le bord, et un bord flou ne coupe pas le suivi
   frequenceCoupure: 4,        // lissage : on garde les mouvements plus lents que 4 Hz
   hysteresis: 0.06,           // 6 cm : écart minimal entre un creux et un sommet
   amplitudeMin: 0.15,         // une rep monte d'au moins 15 cm
@@ -87,7 +98,7 @@ export function champDeGradients(imageData, x0, y0) {
       gy[y * l + x] = (p(x - 1, y + 1) + 2 * p(x, y + 1) + p(x + 1, y + 1)) - (p(x - 1, y - 1) + 2 * p(x, y - 1) + p(x + 1, y - 1));
     }
   }
-  return { x0, y0, l, h, gx, gy };
+  return { x0, y0, l, h, gx, gy, flou };
 }
 
 /* ==========================================================================
@@ -189,6 +200,96 @@ export function localiser(champ, ellipse, px, py, rayon = REGLAGES_VBT.recherche
   return r;
 }
 
+/* ==========================================================================
+   3 bis. Apparence de la face du disque (v14)
+   Le bord d'un disque noir sur un fond sombre est parfois à peine visible, et un autre
+   bord rond (genouillère, cuisse) peut alors « gagner ». La face du disque, elle, reste
+   toujours visible (le disque est entre l'objectif et le corps) et ne ressemble à rien
+   d'autre : on garde son image au départ et, à chaque image, on vérifie que la position
+   trouvée par le bord lui ressemble ; sinon on se recale sur la face.
+   ========================================================================== */
+
+/**
+ * Modèle d'apparence : niveaux de gris (image floutée) d'un anneau de la face du disque,
+ * de 30 % à 85 % du rayon. Le bord (souvent noyé) est exclu, et le centre aussi : le bout
+ * de la barre et son manchon dépassent de 20 à 30 cm vers l'objectif, ils ne bougent donc
+ * pas d'autant de pixels que le disque (parallaxe) et, très contrastés, feraient dériver le suivi.
+ */
+export function modeleApparence(champ, x, y, a, b) {
+  const pas = Math.max(1, Math.round(a / 32));
+  const r = REGLAGES_VBT.anneauFace[1];
+  const r0 = REGLAGES_VBT.anneauFace[0];
+  const dx = [];
+  const dy = [];
+  const v = [];
+  for (let j = -r * a; j <= r * a + 1e-9; j += pas) {
+    for (let i = -r * b; i <= r * b + 1e-9; i += pas) {
+      const d2 = (i / b) ** 2 + (j / a) ** 2;
+      if (d2 > r * r || d2 < r0 * r0) continue;
+      const valeur = lire(champ, champ.flou, x + i, y + j);
+      if (Number.isNaN(valeur)) continue;
+      dx.push(i); dy.push(j); v.push(valeur);
+    }
+  }
+  return { dx: Float32Array.from(dx), dy: Float32Array.from(dy), v: Float32Array.from(v), n: v.length };
+}
+
+/**
+ * Ressemblance (corrélation normalisée, de -1 à 1) entre le modèle et l'image centrée en
+ * (x, y). « saut » : un point sur saut (recherche grossière). -1 si trop de points hors zone.
+ */
+export function ressemblance(champ, modele, x, y, saut = 1) {
+  let n = 0;
+  let st = 0; let st2 = 0; let si = 0; let si2 = 0; let sti = 0;
+  for (let k = 0; k < modele.n; k += saut) {
+    const valeur = lire(champ, champ.flou, x + modele.dx[k], y + modele.dy[k]);
+    if (Number.isNaN(valeur)) continue;
+    const m = modele.v[k];
+    n += 1; st += m; st2 += m * m; si += valeur; si2 += valeur * valeur; sti += m * valeur;
+  }
+  if (n < (0.8 * modele.n) / saut) return -1;
+  const vt = st2 - (st * st) / n;
+  const vi = si2 - (si * si) / n;
+  if (vt <= 1e-6 || vi <= 1e-6) return 0;
+  return (sti - (st * si) / n) / Math.sqrt(vt * vi);
+}
+
+/**
+ * Position la plus ressemblante autour de (px, py) : grille de 2 px, puis 1 px, puis 0,5 px.
+ * rayonX, rayonY : la barre bouge surtout verticalement, on cherche moins loin sur le côté.
+ */
+export function chercherApparence(champ, modele, px, py, rayonX, rayonY = rayonX) {
+  let meilleur = { x: px, y: py, ressemblance: -2 };
+  const essayer = (x, y, saut) => {
+    const c = ressemblance(champ, modele, x, y, saut);
+    if (c > meilleur.ressemblance) meilleur = { x, y, ressemblance: c };
+  };
+  for (let y = py - rayonY; y <= py + rayonY + 1e-9; y += 2) {
+    for (let x = px - rayonX; x <= px + rayonX + 1e-9; x += 2) essayer(x, y, 2);
+  }
+  for (const pas of [1, 0.5]) {
+    const { x: cx, y: cy } = meilleur;
+    meilleur.ressemblance = ressemblance(champ, modele, cx, cy, 1);
+    for (let y = cy - 2 * pas; y <= cy + 2 * pas + 1e-9; y += pas) {
+      for (let x = cx - 2 * pas; x <= cx + 2 * pas + 1e-9; x += pas) essayer(x, y, 1);
+    }
+  }
+  return meilleur;
+}
+
+/** Ressemblance avec la face telle qu'au départ (mêmes points que le modèle). */
+function ressemblanceAuDepart(champ, modele, initial, x, y) {
+  return ressemblance(champ, { ...modele, v: initial }, x, y, 2);
+}
+
+/** Mélange l'image actuelle de la face dans le modèle (part « poids ») : il suit les changements de lumière et d'angle. */
+function rafraichirModele(champ, modele, x, y, poids) {
+  for (let k = 0; k < modele.n; k += 1) {
+    const valeur = lire(champ, champ.flou, x + modele.dx[k], y + modele.dy[k]);
+    if (!Number.isNaN(valeur)) modele.v[k] = (1 - poids) * modele.v[k] + poids * valeur;
+  }
+}
+
 /** Calage dans une fenêtre de ± 6 % autour du diamètre D (méthode du banc d'essai). */
 function calerAutour(champ, cx, cy, D) {
   const bas = 0.94 * D / 2;
@@ -254,22 +355,23 @@ export function estimerDisque(champ, cx, cy, petit) {
 
 /**
  * Ajuste au bord le plus net le cadre réglé par l'utilisatrice ({ x, y, a, b }) :
- * hauteur à ± 2,5 %, rapport largeur/hauteur à ± 0,06, centre à ± rayon pixels.
- * Son réglage reste la référence : on ne va pas chercher un autre anneau plus loin.
+ * hauteur à ± 1,5 %, rapport largeur/hauteur à ± 0,04, centre à ± rayon pixels.
+ * Son réglage reste la référence : on ne va pas chercher un autre bord plus loin (par
+ * exemple l'épaisseur du disque, visible quand le téléphone est plus bas que la barre).
  */
 export function ajusterCadre(champ, cadre, rayon = 6) {
   const rb0 = cadre.b / cadre.a;
   let meilleur = null;
   for (let k = 0; k <= 12; k += 1) {
-    const a = cadre.a * (0.975 + (k * 0.05) / 12);
-    for (let rb = Math.max(0.3, rb0 - 0.06); rb <= Math.min(1.1, rb0 + 0.06) + 1e-9; rb += 0.02) {
+    const a = cadre.a * (0.985 + (k * 0.03) / 12);
+    for (let rb = Math.max(0.3, rb0 - 0.04); rb <= Math.min(1.1, rb0 + 0.04) + 1e-9; rb += 0.02) {
       const r = chercher(champ, contour(a, a * rb), cadre.x, cadre.y, rayon, rayon > 8 ? 2 : 1);
       if (!meilleur || r.valeur > meilleur.valeur) meilleur = { ...r, a, b: a * rb };
     }
   }
   const depart = meilleur;
   for (let a = depart.a - 1; a <= depart.a + 1.0001; a += 0.25) {
-    if (a < 0.975 * cadre.a - 1e-9 || a > 1.025 * cadre.a + 1e-9) continue;
+    if (a < 0.985 * cadre.a - 1e-9 || a > 1.015 * cadre.a + 1e-9) continue;
     for (let b = depart.b - 1; b <= depart.b + 1.0001; b += 0.5) {
       const r = chercher(champ, contour(a, b), depart.x, depart.y, 1, 0.5);
       if (r.valeur > meilleur.valeur) meilleur = { ...r, a, b };
@@ -362,6 +464,11 @@ export async function suivre(video, depart, { mode = 'lecture', debut = 0, surIm
   const S = [];
   const V = [];
   const ecarts = [];
+  const C = [];        // ressemblance avec la face du disque (v14)
+  let modele = null;
+  let initial = null;   // la face telle qu'au départ (garde-fou du modèle qui évolue)
+  let sansFace = 0;
+  let corrections = 0;
   let px = depart.x;
   let py = depart.y;
   let vx = 0;
@@ -379,12 +486,45 @@ export async function suivre(video, depart, { mode = 'lecture', debut = 0, surIm
     const pasHabituel = ecarts.length ? mediane(ecarts.slice(-30)) : dt;
     const facteur = dt > 0 && pasHabituel > 0 ? Math.min(2, Math.max(1, dt / pasHabituel)) : 1;
     const rayon = Math.round(REGLAGES_VBT.recherche * facteur);
+    const rayonFace = Math.max(rayon, Math.round(REGLAGES_VBT.rechercheFace * depart.a * facteur));
     const prevuX = px + vx * dt;
     const prevuY = py + vy * dt;
-    const champ = champAutour(travail, video, prevuX, prevuY, depart.b + rayon + 6, depart.a + rayon + 6);
-    const r = dernierTemps === null
-      ? localiser(champ, ellipse, px, py, 2)
-      : localiser(champ, ellipse, prevuX, prevuY, rayon);
+    const marge = Math.max(rayon, rayonFace) + 6;
+    const champ = champAutour(travail, video, prevuX, prevuY, depart.b + marge, depart.a + marge);
+    let r;
+    let c = 1;
+    if (dernierTemps === null) {
+      r = localiser(champ, ellipse, px, py, 2);
+      modele = modeleApparence(champ, r.x, r.y, depart.a, depart.b);
+      initial = Float32Array.from(modele.v);
+    } else {
+      // 1. Le bord, comme avant : l'ellipse au bord le plus net autour de la position prévue.
+      r = localiser(champ, ellipse, prevuX, prevuY, rayon);
+      c = ressemblance(champ, modele, r.x, r.y, 1);
+      // 2. Si cet endroit ne ressemble pas franchement à la face du disque, on cherche la face,
+      //    surtout en hauteur (la barre bouge surtout verticalement).
+      let corrige = false;
+      if (c < REGLAGES_VBT.faceSure) {
+        const face = chercherApparence(champ, modele, prevuX, prevuY,
+          Math.max(6, Math.round(REGLAGES_VBT.rechercheFaceCote * depart.a * facteur)), rayonFace);
+        if (face.ressemblance < REGLAGES_VBT.ressemblanceMin) sansFace += 1;
+        // 3. Si la face est reconnue sans doute possible ET ressemble nettement plus au disque
+        //    que l'endroit trouvé par le bord (genou, cuisse…), on se recale sur la face, puis on
+        //    affine sur son bord tout près. Sinon (face qui tourne, main, incrustation…), le bord décide.
+        if (face.ressemblance >= REGLAGES_VBT.faceSure && face.ressemblance - c > REGLAGES_VBT.ecartRessemblance) {
+          const affine = localiser(champ, ellipse, face.x, face.y, 3);
+          r = Math.hypot(affine.x - face.x, affine.y - face.y) <= 3.5 ? affine : { ...affine, x: face.x, y: face.y };
+          c = face.ressemblance;
+          corrections += 1;
+          corrige = true;
+        }
+      }
+      // 4. Le modèle suit lentement la face (lumière, angle), seulement quand le bord a trouvé
+      //    seul le disque (sinon le modèle pourrait dériver avec ses propres erreurs).
+      if (!corrige && c >= REGLAGES_VBT.ressemblanceMaj && ressemblanceAuDepart(champ, modele, initial, r.x, r.y) >= REGLAGES_VBT.ressemblanceDepart) {
+        rafraichirModele(champ, modele, r.x, r.y, REGLAGES_VBT.poidsMaj);
+      }
+    }
     if (dt > 0) {
       vx = (0.7 * (r.x - px)) / dt;
       vy = (0.7 * (r.y - py)) / dt;
@@ -392,7 +532,7 @@ export async function suivre(video, depart, { mode = 'lecture', debut = 0, surIm
     px = r.x;
     py = r.y;
     dernierTemps = temps;
-    t.push(temps); X.push(r.x); Y.push(r.y); S.push(r.valeur); V.push(r.visibilite);
+    t.push(temps); X.push(r.x); Y.push(r.y); S.push(r.valeur); V.push(r.visibilite); C.push(c);
     calcul += performance.now() - debutCalcul;
     surImage?.({ temps, x: r.x, y: r.y, valeur: r.valeur, nombre: t.length });
   };
@@ -438,9 +578,11 @@ export async function suivre(video, depart, { mode = 'lecture', debut = 0, surIm
 
   const duree = (performance.now() - debutReel) / 1000;
   return {
-    t, X, Y, S, V,
+    t, X, Y, S, V, C,
     diagnostic: {
       mode: modeReel,
+      sansFace,
+      corrections,
       cadence,
       images: t.length,
       imagesSautees,
@@ -632,12 +774,14 @@ function affiner8(t, y, v) {
  * Un disque un peu coupé par le bord de l'image reste suivi normalement.
  */
 function finDuSuivi(suivi, depart) {
-  const { X, S } = suivi;
+  const { X, S, C } = suivi;
   const habituel = mediane(S);
   let faibles = 0;
   for (let i = 1; i < X.length; i += 1) {
     if (Math.abs(X[i] - X[0]) > 2 * depart.b) return i;
-    faibles = S[i] < 0.35 * habituel ? faibles + 1 : 0;
+    // Bord flou : on coupe, sauf si la face du disque est bien reconnue (v14)
+    const faceSure = C && C[i] >= REGLAGES_VBT.faceSure;
+    faibles = S[i] < 0.35 * habituel && !faceSure ? faibles + 1 : 0;
     if (faibles >= 3) return i - 2;
   }
   return X.length;

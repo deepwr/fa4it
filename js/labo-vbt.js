@@ -94,7 +94,7 @@ function htmlOutil(reglages) {
       <div id="labo-reglage" class="groupe" hidden>
         <p class="etiquette">3. Ajustez le cadre au bord du plus grand disque</p>
         <canvas id="labo-loupe" class="labo-loupe"></canvas>
-        <p class="texte-secondaire">Faites glisser chaque côté bleu sur le bord extérieur du disque ; glissez au milieu pour déplacer le cadre. Filmé de biais, le disque est un ovale : le cadre est alors plus étroit que haut, c’est normal.</p>
+        <p class="texte-secondaire">Faites glisser chaque côté bleu sur le bord de la face du disque (sans son épaisseur, visible si le téléphone est plus bas ou plus haut que la barre) ; glissez au milieu pour déplacer le cadre. Filmé de biais, le disque est un ovale : le cadre est alors plus étroit que haut, c’est normal.</p>
         <div class="rangee">
           <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="labo-ajuster">Ajuster au bord</button>
           <button class="bouton bouton-petit" type="button" data-action="labo-valider">C’est bon</button>
@@ -138,7 +138,7 @@ async function ecranLabo() {
       <section class="carte">
         <h2>Essai de la VBT vidéo</h2>
         <p class="texte-secondaire">Filmez une série ou choisissez une vidéo : l’app suit le disque au bout de la barre et calcule la vitesse de chaque rep. La vidéo n’est ni enregistrée ni envoyée, et vos données ne sont pas touchées.</p>
-        <p class="texte-secondaire">Pour un bon résultat : téléphone fixe (trépied), face au bout de la barre, disque entier visible du début à la fin.</p>
+        <p class="texte-secondaire">Pour un bon résultat : téléphone fixe (trépied), à 2,5–3 m, face au bout de la barre et à sa hauteur à mi-mouvement, disque entier visible du début à la fin.</p>
         ${boutonVideo()}
       </section>
       ${htmlOutil(reglages)}
@@ -185,7 +185,7 @@ async function ecranMesure([idBloc, idSemaine, idJour, idExercice, liste = 'seri
         <h2>Mesurer en vidéo · ${echapper(nom)}</h2>
         <p class="texte-secondaire">${echapper(jour.nom)} · ${formaterNombre(serie.charge) || '?'} kg × ${formaterNombre(serie.repetitions) || '?'}</p>
         ${ancienne}
-        <p class="texte-secondaire">Téléphone fixe, face au bout de la barre et à sa hauteur, disque entier visible (1080p à 60 i/s conseillé). La vidéo n’est ni gardée ni envoyée : seuls les chiffres le sont, et seulement si vous remplissez la série.</p>
+        <p class="texte-secondaire">Téléphone fixe, à 2,5–3 m, face au bout de la barre et à sa hauteur à mi-mouvement (vers les hanches pour le squat), disque entier visible (1080p à 60 i/s conseillé). La vidéo n’est ni gardée ni envoyée : seuls les chiffres le sont, et seulement si vous remplissez la série.</p>
         ${boutonVideo()}
       </section>
       ${htmlOutil(reglages)}
@@ -729,6 +729,7 @@ function afficherResultats() {
         <li>Mode : ${modes[d.mode]}${d.cadence ? ` · cadence estimée ${d.cadence} i/s` : ''}</li>
         <li>Images analysées : ${d.images} (${Math.round(d.imagesParSeconde)} par seconde de vidéo) · images sautées : ${d.imagesSautees}</li>
         <li>Calcul : ${format(d.calculParImage, 1)} ms par image · analyse ${format(d.dureeAnalyse, 1)} s pour ${format(d.dureeVideo, 1)} s de vidéo</li>
+        <li>Face du disque : reconnue sur ${suivi.C?.length ? Math.round((100 * (suivi.C.length - (d.sansFace ?? 0))) / suivi.C.length) : '—'} % des images · ressemblance médiane ${suivi.C?.length ? format([...suivi.C].sort((u, v) => u - v)[Math.floor(suivi.C.length / 2)], 2) : '—'}</li>
         <li>Image de travail : ${d.largeur} × ${d.hauteur} px · disque ${Math.round(2 * etat.analyse.depart.a)} × ${Math.round(2 * etat.analyse.depart.b)} px (hauteur × largeur) pour ${format(diametre * 100, 1)} cm · ${format(resultat.metresParPixel * 1000, 2)} mm par pixel</li>
         <li>Navigateur : ${'requestVideoFrameCallback' in HTMLVideoElement.prototype ? 'lecture image par image disponible' : 'requestVideoFrameCallback absent'} · ${window.matchMedia('(display-mode: standalone)').matches ? 'app de l’écran d’accueil' : 'Safari'}</li>
       </ul>
