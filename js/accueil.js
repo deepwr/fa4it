@@ -107,7 +107,7 @@ export function versetDuJour() {
 async function informations() {
   const blocs = await lireBlocs();
   if (blocs.length === 0) {
-    return { seance: 'Aucun programme', programme: 'Aucun bloc', sauvegarde: await texteSauvegarde(blocs) };
+    return { seance: 'Aucun programme', programme: 'Aucun bloc', historique: 'Aucune séance', sauvegarde: await texteSauvegarde(blocs) };
   }
   // Même bloc et même « prochaine séance » que l'écran Séance
   const idChoisi = await lireReglage('blocSeance');
@@ -117,9 +117,12 @@ async function informations() {
     const jour = semaine.jours.find((j) => !j.dateRealisee);
     if (jour) { prochaine = { semaine, jour }; break; }
   }
+  // Nombre de séances faites, tous blocs confondus
+  const faites = blocs.reduce((n, b) => n + b.semaines.reduce((m, s) => m + s.jours.filter((j) => j.dateRealisee).length, 0), 0);
   return {
     seance: prochaine ? `S${formaterNombre(prochaine.semaine.numero) || '?'} · ${prochaine.jour.nom}` : 'Tout est fait',
     programme: bloc.nom,
+    historique: faites > 0 ? pluriel(faites, 'séance faite', 'séances faites') : 'Aucune séance',
     sauvegarde: await texteSauvegarde(blocs),
   };
 }
@@ -186,7 +189,7 @@ async function ecranAccueil() {
         <div class="tuiles-grille">
           ${tuile('programme', 'Programme', infos.programme)}
           ${tuile('suivi', 'Suivi', 'e1RM et vitesse')}
-          ${tuile('historique', 'Historique', 'Séances passées')}
+          ${tuile('historique', 'Historique', infos.historique)}
           ${tuile('sauvegarde', 'Sauvegarde', infos.sauvegarde)}
         </div>
       </nav>

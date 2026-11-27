@@ -1,14 +1,13 @@
 // FA 4 IT — js/labo-vbt.js
 // Analyser une vidéo de série pour mesurer la vitesse de barre et tracer la trajectoire.
-// Deux écrans utilisent le même outil :
-//   #/labo  « Labo VBT » (essai), ouvert depuis Sauvegarde › Application :
-//           il ne lit ni n'écrit AUCUNE donnée de l'app.
 //   #/vbt/<bloc>/<semaine>/<jour>/<exercice>/<liste>/<numéro>
 //           « Mesurer en vidéo », ouvert depuis une série (ou le last warm-up) de la
 //           séance : après confirmation, la vitesse moyenne remplit la série et le
 //           détail de la mesure (reps, trajectoire en chiffres) est gardé avec elle.
-// Dans les deux cas, la vidéo reste en mémoire le temps de l'analyse, puis elle est
-// libérée : elle n'est jamais enregistrée ni envoyée sur internet.
+// La vidéo reste en mémoire le temps de l'analyse, puis elle est libérée : elle n'est
+// jamais enregistrée ni envoyée sur internet.
+// v18 : plus d'écran « Labo VBT » d'essai (doublon de la mesure depuis la séance), plus de
+// bloc « Diagnostic » ; ce fichier et vbt-analyse.js ne sont chargés qu'à la première mesure.
 
 import {
   estimerDisque, ajusterCadre, suivre, resultats, champAutour, toileDeTravail, tailleDeTraitement, allerA,
@@ -129,24 +128,6 @@ function htmlOutil(reglages) {
   `;
 }
 
-async function ecranLabo() {
-  liberer();
-  const reglages = await lireReglagesVbt();
-  return {
-    titre: 'Labo VBT',
-    html: `
-      <section class="carte">
-        <h2>Essai de la VBT vidéo</h2>
-        <p class="texte-secondaire">Filmez une série ou choisissez une vidéo : l’app suit le disque au bout de la barre et calcule la vitesse de chaque rep. La vidéo n’est ni enregistrée ni envoyée, et vos données ne sont pas touchées.</p>
-        <p class="texte-secondaire">Pour un bon résultat : téléphone fixe (trépied), à 2,5–3 m, face au bout de la barre et à sa hauteur à mi-mouvement, disque entier visible du début à la fin.</p>
-        ${boutonVideo()}
-      </section>
-      ${htmlOutil(reglages)}
-    `,
-    actions: '<a class="bouton bouton-secondaire bouton-retour" href="#/sauvegarde">Retour</a>',
-  };
-}
-
 /** Retrouve la série visée par l'adresse (ou lance une erreur claire). */
 function trouverSerie(bloc, idSemaine, idJour, idExercice, liste, index) {
   const semaine = bloc.semaines.find((s) => s.id === idSemaine);
@@ -208,7 +189,7 @@ function majActions(vitesse = null) {
 
 // En quittant ces écrans, on libère la vidéo de la mémoire (une analyse en cours s'arrête)
 window.addEventListener('hashchange', () => {
-  if (!location.hash.startsWith('#/labo') && !location.hash.startsWith('#/vbt/')) liberer();
+  if (!location.hash.startsWith('#/vbt/')) liberer();
 });
 
 /** Oublie la vidéo en cours (mémoire) et arrête une analyse en cours ; garde la série visée. */
@@ -687,10 +668,9 @@ function htmlRemplir(reps, moyenne) {
 }
 
 function afficherResultats() {
-  const { suivi, resultat, diametre } = etat.analyse;
+  const { resultat } = etat.analyse;
   const reps = resultat.reps;
   const zone = $('labo-resultats');
-  const d = suivi.diagnostic;
   const moyenne = vitesseDeLaSerie(reps);
   const avecDouteuses = reps.some((r) => r.douteuse);
 
@@ -704,7 +684,6 @@ function afficherResultats() {
       <td>${r.douteuse ? '⚠︎ ' : ''}${Math.round(r.qualite * 100)} %</td>
     </tr>`).join('');
 
-  const modes = { lecture: 'lecture normale', ralenti: 'lecture au ralenti', image: 'image par image' };
   zone.innerHTML = `
     <h2>Résultats</h2>
     ${reps.length === 0
@@ -723,17 +702,6 @@ function afficherResultats() {
     ${resultat.interrompu !== null ? `<p class="texte-secondaire">Suivi arrêté à ${format(resultat.interrompu, 1)} s : le disque a quitté sa zone (barre reposée, sortie de l’image ou disque caché). Ce qui suit n’est pas compté.</p>` : ''}
     <button class="bouton bouton-secondaire bouton-large" type="button" data-action="labo-revoir">Revoir avec la trajectoire</button>
     ${htmlRemplir(reps, moyenne)}
-    <details class="details">
-      <summary>Diagnostic (pour Claude)</summary>
-      <ul class="liste-vitesses">
-        <li>Mode : ${modes[d.mode]}${d.cadence ? ` · cadence estimée ${d.cadence} i/s` : ''}</li>
-        <li>Images analysées : ${d.images} (${Math.round(d.imagesParSeconde)} par seconde de vidéo) · images sautées : ${d.imagesSautees}</li>
-        <li>Calcul : ${format(d.calculParImage, 1)} ms par image · analyse ${format(d.dureeAnalyse, 1)} s pour ${format(d.dureeVideo, 1)} s de vidéo</li>
-        <li>Face du disque : reconnue sur ${suivi.C?.length ? Math.round((100 * (suivi.C.length - (d.sansFace ?? 0))) / suivi.C.length) : '—'} % des images · ressemblance médiane ${suivi.C?.length ? format([...suivi.C].sort((u, v) => u - v)[Math.floor(suivi.C.length / 2)], 2) : '—'}</li>
-        <li>Image de travail : ${d.largeur} × ${d.hauteur} px · disque ${Math.round(2 * etat.analyse.depart.a)} × ${Math.round(2 * etat.analyse.depart.b)} px (hauteur × largeur) pour ${format(diametre * 100, 1)} cm · ${format(resultat.metresParPixel * 1000, 2)} mm par pixel</li>
-        <li>Navigateur : ${'requestVideoFrameCallback' in HTMLVideoElement.prototype ? 'lecture image par image disponible' : 'requestVideoFrameCallback absent'} · ${window.matchMedia('(display-mode: standalone)').matches ? 'app de l’écran d’accueil' : 'Safari'}</li>
-      </ul>
-    </details>
   `;
   zone.hidden = false;
   majActions(reps.length > 0 ? moyenne : null);
@@ -865,7 +833,6 @@ async function retourSeance() {
    ========================================================================== */
 
 export const ecransLabo = {
-  labo: { onglet: 'sauvegarde', afficher: ecranLabo },
   vbt: { onglet: 'seance', afficher: ecranMesure },
 };
 

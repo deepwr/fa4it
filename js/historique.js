@@ -1,7 +1,10 @@
 // FA 4 IT — js/historique.js
-// L'onglet « Historique » : e1RM par mouvement sur tout le bloc et pour
-// chaque semaine, séries exclues, last warm-ups (repère de forme du jour),
-// vitesses enregistrées et table RPE utilisée.
+// v18 : la page « Historique » = la liste des séances faites, de la plus récente
+// à la plus ancienne, groupées par mois ; chacune ouvre sa séance.
+// Ce fichier fournit aussi à la page Suivi (suivi.js) :
+//   - sectionsDuBloc : e1RM par mouvement sur tout le bloc et pour chaque semaine,
+//     séries exclues, last warm-ups (repère de forme du jour), vitesses enregistrées ;
+//   - htmlTableRpe : la table RPE utilisée, avec son contrôle.
 
 import { lireBlocs, lireReglage, ecrireReglage } from './db.js';
 import { TABLE_RPE } from './rpe-table.js';
@@ -91,7 +94,7 @@ function htmlLastWarmups(semaine) {
    2. Table RPE utilisée, avec son contrôle
    ========================================================================== */
 
-function htmlTable() {
+export function htmlTableRpe() {
   const rpes = Object.keys(TABLE_RPE).sort((a, b) => Number(b) - Number(a));
   const colonnes = Math.max(...rpes.map((rpe) => (Array.isArray(TABLE_RPE[rpe]) ? TABLE_RPE[rpe].length : 0)));
   const entete = Array.from({ length: colonnes }, (_, i) => `<th scope="col">${i + 1}</th>`).join('');
@@ -124,19 +127,11 @@ function htmlTable() {
 }
 
 /* ==========================================================================
-   3. L'écran
+   3. Pour la page Suivi : l'e1RM dans le bloc, semaine par semaine
    ========================================================================== */
 
-async function ecranHistorique() {
-  const blocs = await lireBlocs();
-  if (blocs.length === 0) {
-    return {
-      titre: 'Historique',
-      html: carteVide('Pas encore de données', 'Créez un bloc dans la page Programme, ou chargez l’exemple depuis la page Sauvegarde.'),
-    };
-  }
-
-  // Même bloc que dans l'onglet Séance (choix partagé)
+export async function sectionsDuBloc(blocs) {
+  // Même bloc que dans la page Séance (choix partagé)
   const idChoisi = await lireReglage('blocSeance');
   const bloc = blocs.find((b) => b.id === idChoisi) ?? blocs[0];
   const choixBloc = blocs.length > 1
@@ -173,21 +168,110 @@ async function ecranHistorique() {
     return carte;
   }).join('');
 
+  return `
+    <h2 class="titre-section">Dans le bloc</h2>
+    ${choixBloc}
+    <section class="carte">
+      <h2>${echapper(bloc.nom)}</h2>
+      <p class="texte-secondaire">e1RM moyen sur tout le bloc : Squat, Bench et Deadlift en format compétition (variantes, accessoires et échauffements non comptés).</p>
+      ${htmlResultats(resultatBloc, { exclusions: 'resume' })}
+    </section>
+    <details class="details-section">
+      <summary>Semaine par semaine</summary>
+      <div class="details-section-contenu">
+        ${cartesSemaines || carteVide('Aucune semaine', 'Ce bloc ne contient pas encore de semaine.')}
+      </div>
+    </details>
+  `;
+}
+
+/* ==========================================================================
+   4. La page Historique : les séances faites
+   ========================================================================== */
+
+/** « 2026-11-27 » → date locale (minuit), sans décalage de fuseau. */
+function dateLocale(dateIso) {
+  const [annee, mois, jour] = dateIso.slice(0, 10).split('-').map(Number);
+  return new Date(annee, mois - 1, jour);
+}
+
+function moisEnTitre(date) {
+  const texte = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  return texte.charAt(0).toUpperCase() + texte.slice(1);
+}
+
+/** Toutes les séances faites, de la plus récente à la plus ancienne. */
+function seancesFaites(blocs) {
+  const seances = [];
+  for (const bloc of blocs) {
+    for (const semaine of bloc.semaines) {
+      for (const jour of semaine.jours) {
+        if (!jour.dateRealisee) continue;
+        let faites = 0;
+        let filmees = 0;
+        for (const exercice of jour.exercices) {
+          for (const serie of exercice.series) {
+            if (serie.faite) faites += 1;
+            if (serie.vbt) filmees += 1;
+          }
+        }
+        seances.push({ bloc, semaine, jour, faites, filmees });
+      }
+    }
+  }
+  return seances.sort((a, b) => b.jour.dateRealisee.localeCompare(a.jour.dateRealisee));
+}
+
+function ligneSeance({ bloc, semaine, jour, faites, filmees }, avecBloc) {
+  const date = dateLocale(jour.dateRealisee);
+  const details = [pluriel(faites, 'série faite', 'séries faites')];
+  if (filmees > 0) details.push(pluriel(filmees, 'filmée', 'filmées'));
+  if (avecBloc) details.push(bloc.nom);
+  return `
+    <a class="ligne-seance" href="#/seance/${echapper(bloc.id)}/${echapper(semaine.id)}/${echapper(jour.id)}">
+      <span class="date-seance" aria-hidden="true">
+        <span class="date-seance-jour">${date.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
+        <strong>${date.getDate()}</strong>
+      </span>
+      <span class="ligne-seance-texte">
+        <strong>S${formaterNombre(semaine.numero) || '?'} · ${echapper(jour.nom)}</strong>
+        <span class="texte-secondaire">${echapper(details.join(' · '))}</span>
+        <span class="visuellement-cache">${date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+      </span>
+      <span class="chevron" aria-hidden="true">›</span>
+    </a>
+  `;
+}
+
+async function ecranHistorique() {
+  const blocs = await lireBlocs();
+  const seances = seancesFaites(blocs);
+  if (seances.length === 0) {
+    return {
+      titre: 'Historique',
+      html: carteVide('Aucune séance faite', 'Les séances apparaissent ici dès qu’elles sont faites.'),
+    };
+  }
+  const avecBloc = new Set(seances.map((s) => s.bloc.id)).size > 1;
+
+  // Groupées par mois
+  const mois = [];
+  for (const seance of seances) {
+    const titre = moisEnTitre(dateLocale(seance.jour.dateRealisee));
+    if (mois.at(-1)?.titre !== titre) mois.push({ titre, seances: [] });
+    mois.at(-1).seances.push(seance);
+  }
+
   return {
     titre: 'Historique',
     html: `
-      ${choixBloc}
-      <section class="carte">
-        <h2>${echapper(bloc.nom)}</h2>
-        <p class="texte-secondaire">e1RM moyen sur tout le bloc : Squat, Bench et Deadlift en format compétition (variantes, accessoires et échauffements non comptés).</p>
-        ${htmlResultats(resultatBloc, { exclusions: 'resume' })}
-      </section>
-
-      <h2 class="titre-section">Par semaine</h2>
-      ${cartesSemaines || carteVide('Aucune semaine', 'Ce bloc ne contient pas encore de semaine.')}
-
-      <h2 class="titre-section">Table RPE</h2>
-      ${htmlTable()}
+      <p class="texte-secondaire">${pluriel(seances.length, 'séance faite', 'séances faites')}. Touchez une séance pour la revoir.</p>
+      ${mois.map((m) => `
+        <section class="carte carte-mois">
+          <h2>${m.titre}</h2>
+          <div class="liste-seances">${m.seances.map((s) => ligneSeance(s, avecBloc)).join('')}</div>
+        </section>
+      `).join('')}
     `,
   };
 }
@@ -198,7 +282,7 @@ async function choisirBloc(liste) {
 }
 
 /* ==========================================================================
-   4. Ce que app.js utilise
+   5. Ce que app.js utilise
    ========================================================================== */
 
 export const ecransHistorique = {

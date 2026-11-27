@@ -1,8 +1,10 @@
 // FA 4 IT — js/sauvegarde.js
 // L'écran « Sauvegarde » : état des données, export, import, copie de secours,
-// lien avec le Google Sheets du coach, données d'exemple, version de l'app,
-// protection du stockage et effacement.
-// Fournit aussi le rappel de sauvegarde affiché dans l'onglet Séance.
+// lien avec le Google Sheets du coach, version de l'app, protection du stockage
+// et effacement.
+// Fournit aussi le rappel de sauvegarde affiché dans la page Séance.
+// v18 : plus de « Données d'exemple » (le bouton remplaçait toutes les données),
+// de bouton « Rechercher une mise à jour » (elles s'installent seules) ni de Labo VBT.
 
 import {
   lireBlocs, lireBlocsComplets, remplacerTousLesBlocs, lireReglage, ecrireReglage, etatStockage,
@@ -187,17 +189,9 @@ export async function ecranSauvegarde() {
     ${await carteReglageSheets()}
 
     <section class="carte">
-      <h2>Données d’exemple</h2>
-      <p class="texte-secondaire">Un bloc de 4 semaines × 3 jours, dont 3 semaines déjà réalisées, pour tester l’app.</p>
-      <button class="bouton bouton-secondaire bouton-large" type="button" data-action="charger-exemple">Charger l’exemple</button>
-    </section>
-
-    <section class="carte">
       <h2>Application</h2>
       <p>Version installée : <strong>${version ?? 'inconnue'}</strong></p>
       <p class="texte-secondaire">Les mises à jour s’installent toutes seules quand vous ouvrez l’app avec du réseau, puis s’appliquent à l’ouverture suivante. Elles ne touchent jamais à vos données.</p>
-      <button class="bouton bouton-secondaire bouton-large" type="button" data-action="rechercher-mise-a-jour">Rechercher une mise à jour</button>
-      <a class="bouton bouton-secondaire bouton-large" href="#/labo">Labo VBT (essai)</a>
     </section>
 
     <section class="carte">
@@ -258,7 +252,7 @@ async function exporter() {
 }
 
 /* --------------------------------------------------------------------------
-   Import, exemple, copie de secours et effacement
+   Import, copie de secours et effacement
    -------------------------------------------------------------------------- */
 
 /** Remplace toutes les données, après confirmation s'il y a déjà des données. */
@@ -293,15 +287,6 @@ async function importer(champ) {
   const sauvegarde = lireSauvegarde(await fichier.text());
   const date = sauvegarde.exporteLe ? `, exporté le ${formaterDateHeure(sauvegarde.exporteLe)}` : '';
   await remplacerAvecConfirmation(sauvegarde.blocs, `le fichier « ${fichier.name} »${date}`, `l’import du fichier « ${fichier.name} »`);
-}
-
-async function chargerExemple() {
-  const reponse = await fetch('data/exemple.json');
-  if (!reponse.ok) {
-    throw new Error(`Le fichier data/exemple.json est introuvable (erreur ${reponse.status}).`);
-  }
-  const sauvegarde = lireSauvegarde(await reponse.text());
-  await remplacerAvecConfirmation(sauvegarde.blocs, 'les données d’exemple', 'le chargement des données d’exemple');
 }
 
 async function restaurerCopie() {
@@ -341,37 +326,14 @@ async function toutEffacer() {
 }
 
 /* --------------------------------------------------------------------------
-   Mises à jour de l'app
-   -------------------------------------------------------------------------- */
-
-async function rechercherMiseAJour() {
-  const inscription = await navigator.serviceWorker?.getRegistration();
-  if (!inscription) {
-    afficherMessage('Mode hors ligne pas encore installé : rouvrez l’app');
-    return;
-  }
-  try {
-    await inscription.update();
-  } catch {
-    afficherMessage('Pas de réseau : réessayez plus tard');
-    return;
-  }
-  afficherMessage(inscription.installing || inscription.waiting
-    ? 'Nouvelle version trouvée : elle s’installe…'
-    : 'Vous avez la dernière version');
-}
-
-/* --------------------------------------------------------------------------
    Ce que app.js branche sur les boutons (data-action) et les champs (data-changement)
    -------------------------------------------------------------------------- */
 
 export const boutonsSauvegarde = {
   'exporter': exporter,
   'choisir-fichier': choisirFichier,
-  'charger-exemple': chargerExemple,
   'restaurer-copie': restaurerCopie,
   'supprimer-copie': supprimerCopie,
-  'rechercher-mise-a-jour': rechercherMiseAJour,
   'tout-effacer': toutEffacer,
   ...boutonsSheets,   // Google Sheets du coach : tester, envoyer une séance ou un bloc
 };

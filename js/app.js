@@ -10,7 +10,6 @@ import { demanderStockagePersistant } from './db.js';
 import { ecransProgrammation, boutonsProgrammation, changementsProgrammation } from './programmation.js';
 import { ecransSeance, boutonsSeance, changementsSeance } from './seance.js';
 import { ecransSuivi, boutonsSuivi } from './suivi.js';
-import { ecransLabo, boutonsLabo, changementsLabo } from './labo-vbt.js';
 import { ecransHistorique, changementsHistorique } from './historique.js';
 import { ecransVitesse, boutonsVitesse, changementsVitesse } from './vitesse.js';
 import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sauvegarde.js';
@@ -31,7 +30,9 @@ const ecrans = {
   ...ecransSeance,          // seance (voir seance.js)
   ...ecransSuivi,           // suivi (voir suivi.js)
   ...ecransHistorique,      // historique (voir historique.js)
-  ...ecransLabo,            // labo VBT, ouvert depuis Sauvegarde (voir labo-vbt.js)
+  // Mesure vidéo (#/vbt/…) : le code (labo-vbt.js + vbt-analyse.js, ~80 Ko) n'est chargé
+  // qu'à la première mesure, pas à l'ouverture de l'app (v18).
+  vbt: { onglet: 'seance', afficher: async (parametres) => (await charger('./labo-vbt.js')).ecransLabo.vbt.afficher(parametres) },
   ...ecransVitesse,         // détail d'une série et vitesse à charge égale (voir vitesse.js)
 
   sauvegarde: {
@@ -154,6 +155,30 @@ async function afficherEcran(evenement) {
    Un bouton déclare son action avec data-action="nom-de-l-action".
    Un champ déclare la sienne avec data-changement="nom-de-l-action".
    -------------------------------------------------------------------------- */
+
+/* Modules chargés seulement au premier usage */
+const modulesCharges = new Map();   // chemin → module, une fois chargé
+
+/** Charge un module (une seule fois) et le garde sous la main. */
+async function charger(chemin) {
+  if (!modulesCharges.has(chemin)) modulesCharges.set(chemin, await import(chemin));
+  return modulesCharges.get(chemin);
+}
+
+/**
+ * Actions d'un module chargé au premier usage. Quand ses boutons sont à l'écran, le module
+ * est déjà chargé : l'action est alors appelée tout de suite, sans attendre (l'iPhone
+ * n'ouvre le choix d'une vidéo que juste après un appui).
+ */
+function aLaDemande(chemin, export_, noms) {
+  return Object.fromEntries(noms.map((nom) => [nom, (element) => {
+    const module = modulesCharges.get(chemin);
+    return module ? module[export_][nom](element) : charger(chemin).then((m) => m[export_][nom](element));
+  }]));
+}
+const boutonsLabo = aLaDemande('./labo-vbt.js', 'boutonsLabo',
+  ['labo-choisir', 'labo-analyser', 'labo-arreter', 'labo-revoir', 'labo-ajuster', 'labo-valider', 'vbt-remplir', 'vbt-retour']);
+const changementsLabo = aLaDemande('./labo-vbt.js', 'changementsLabo', ['labo-video', 'vbt-reglage']);
 
 const actionsBoutons = {
   'menu-ouvrir': ouvrirMenu,

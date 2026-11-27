@@ -11,11 +11,13 @@
 //
 // L'import du programme du coach (CSV) est dans import-coach.js ; son bouton
 // est sur l'écran Programme.
+// v18 : les blocs viennent du CSV du coach. On ne crée plus de bloc, de semaine ou
+// de jour à la main, et on ne duplique ni ne déplace plus rien ; restent les
+// modifications de champs, l'ajout et le retrait d'un exercice, la suppression d'un bloc.
 
-import { lireBlocs, lireBloc, enregistrerBloc, modifierBloc, supprimerBloc } from './db.js';
+import { lireBlocs, lireBloc, modifierBloc, supprimerBloc } from './db.js';
 import {
-  MOUVEMENTS, OBJECTIFS, compter, lireNombre, nouvelId, devinerMouvement, estFormatCompetition,
-  nouveauBloc, nouvelleSemaine, nouveauJour, nouvelExercice,
+  MOUVEMENTS, OBJECTIFS, compter, lireNombre, devinerMouvement, estFormatCompetition, nouvelExercice,
 } from './modele.js';
 import { boutonsImportCoach, changementsImportCoach } from './import-coach.js';
 import {
@@ -65,52 +67,6 @@ async function chargerBloc(idBloc) {
   const bloc = await lireBloc(idBloc);
   if (!bloc) throw new Error('Ce bloc n’existe plus.');
   return bloc;
-}
-
-/** Numéro de la prochaine semaine : le plus grand numéro + 1. */
-function numeroSuivant(bloc) {
-  return Math.max(0, ...bloc.semaines.map((s) => s.numero ?? 0)) + 1;
-}
-
-/** Ajoute un nombre de jours à une date AAAA-MM-JJ. */
-function ajouterJours(dateIso, nombreDeJours) {
-  const date = new Date(`${dateIso}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + nombreDeJours);
-  return date.toISOString().slice(0, 10);
-}
-
-/* --- Copies : nouveaux identifiants, séries réalisées vidées, dates décalées --- */
-
-function copierExercice(exercice) {
-  return {
-    id: nouvelId(),
-    nom: exercice.nom,
-    mouvement: exercice.mouvement,
-    formatCompetition: exercice.formatCompetition ?? estFormatCompetition(exercice.nom, exercice.mouvement),
-    consignes: exercice.consignes ?? '',
-    prescription: { ...exercice.prescription },   // « ... » recopie chaque valeur
-    echauffement: [],
-    series: [],
-  };
-}
-
-function copierJour(jour, decalageJours) {
-  return {
-    id: nouvelId(),
-    nom: jour.nom,
-    datePrevue: jour.datePrevue ? ajouterJours(jour.datePrevue, decalageJours) : null,
-    dateRealisee: null,
-    exercices: jour.exercices.map(copierExercice),
-  };
-}
-
-function copierSemaine(semaine, numero, decalageJours) {
-  return {
-    id: nouvelId(),
-    numero,
-    notes: semaine.notes,
-    jours: semaine.jours.map((jour) => copierJour(jour, decalageJours)),
-  };
 }
 
 /* ==========================================================================
@@ -247,7 +203,7 @@ function filAriane(etapes) {
 }
 
 /** Les gros boutons du bas : « Retour » à gauche, l'action principale à droite. */
-function boutonsBas(adresseRetour, boutonPrincipal) {
+function boutonsBas(adresseRetour, boutonPrincipal = '') {
   return `
     <a class="bouton bouton-secondaire bouton-retour" href="${adresseRetour}">‹ Retour</a>
     ${boutonPrincipal}
@@ -333,8 +289,6 @@ function carteExercice(idsJour, exercice, position, nombre) {
       ${champ({ ids, nom: 'consignes', etiquette: 'Consignes', valeur: exercice.consignes, format: 'notes', indice: 'Repos, tempo, indications du coach…' })}
       ${faites > 0 ? `<p class="texte-secondaire">${pluriel(faites, 'série réalisée', 'séries réalisées')}</p>` : ''}
       <div class="rangee">
-        <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="monter-exercice" ${attributsCible(ids)} aria-label="Monter l’exercice"${position === 0 ? ' disabled' : ''}>↑</button>
-        <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="descendre-exercice" ${attributsCible(ids)} aria-label="Descendre l’exercice"${position === nombre - 1 ? ' disabled' : ''}>↓</button>
         <button class="bouton bouton-alerte bouton-petit" type="button" data-action="supprimer-exercice" ${attributsCible(ids)}>Supprimer</button>
       </div>
     </section>
@@ -370,11 +324,10 @@ async function ecranProgramme() {
   const blocs = await lireBlocs();
   const liste = blocs.length > 0
     ? blocs.map(carteBloc).join('')
-    : carteVide('Aucun bloc pour l’instant', 'Importez le programme du coach, créez un bloc avec le bouton ci-dessous, ou chargez l’exemple depuis la page Sauvegarde.');
+    : carteVide('Aucun bloc pour l’instant', 'Importez le programme du coach avec le bouton ci-dessous.');
   return {
     titre: 'Programme',
     html: liste + carteImportCoach(),
-    actions: '<button class="bouton" type="button" data-action="nouveau-bloc">+ Nouveau bloc</button>',
   };
 }
 
@@ -385,7 +338,7 @@ async function ecranBloc([idBloc]) {
     .map((objectif) => ({ valeur: objectif, libelle: majusculeInitiale(objectif) }));
   const semaines = bloc.semaines.length > 0
     ? bloc.semaines.map((semaine) => carteSemaine(bloc, semaine)).join('')
-    : carteVide('Aucune semaine', 'Ajoutez une semaine avec le bouton « + Semaine ».');
+    : carteVide('Aucune semaine', 'Mettez le bloc à jour avec le CSV du coach.');
 
   return {
     titre: bloc.nom,
@@ -407,7 +360,7 @@ async function ecranBloc([idBloc]) {
         <button class="bouton bouton-alerte bouton-large" type="button" data-action="supprimer-bloc" ${attributsCible(ids)}>Supprimer ce bloc</button>
       </div>
     `,
-    actions: boutonsBas(adresse.programme(), `<button class="bouton" type="button" data-action="ajouter-semaine" ${attributsCible(ids)}>+ Semaine</button>`),
+    actions: boutonsBas(adresse.programme()),
   };
 }
 
@@ -417,7 +370,7 @@ async function ecranSemaine([idBloc, idSemaine]) {
   const ids = { bloc: bloc.id, semaine: semaine.id };
   const jours = semaine.jours.length > 0
     ? semaine.jours.map((jour) => carteJour(bloc, semaine, jour)).join('')
-    : carteVide('Aucun jour', 'Ajoutez un jour d’entraînement avec le bouton « + Jour ».');
+    : carteVide('Aucun jour', 'Mettez le bloc à jour avec le CSV du coach.');
 
   return {
     titre: `Semaine ${formaterNombre(semaine.numero)}`,
@@ -433,18 +386,8 @@ async function ecranSemaine([idBloc, idSemaine]) {
 
       <h2 class="titre-section">Jours</h2>
       ${jours}
-
-      <section class="carte">
-        <h2>Dupliquer cette semaine</h2>
-        <p class="texte-secondaire">Crée la semaine ${numeroSuivant(bloc)} à la fin du bloc, avec les mêmes jours et prescriptions, sans les séries réalisées. Les dates prévues sont décalées d’autant de semaines.</p>
-        <button class="bouton bouton-secondaire bouton-large" type="button" data-action="dupliquer-semaine" ${attributsCible(ids)}>Dupliquer la semaine</button>
-      </section>
-
-      <div class="zone-danger">
-        <button class="bouton bouton-alerte bouton-large" type="button" data-action="supprimer-semaine" ${attributsCible(ids)}>Supprimer cette semaine</button>
-      </div>
     `,
-    actions: boutonsBas(adresse.bloc(bloc.id), `<button class="bouton" type="button" data-action="ajouter-jour" ${attributsCible(ids)}>+ Jour</button>`),
+    actions: boutonsBas(adresse.bloc(bloc.id)),
   };
 }
 
@@ -456,13 +399,6 @@ async function ecranJour([idBloc, idSemaine, idJour]) {
   const exercices = nombre > 0
     ? jour.exercices.map((exercice, position) => carteExercice(ids, exercice, position, nombre)).join('')
     : carteVide('Aucun exercice', 'Ajoutez un exercice avec le bouton « + Exercice ».');
-
-  // Semaine proposée pour la copie : la suivante si elle existe, sinon celle-ci.
-  const position = bloc.semaines.indexOf(semaine);
-  const destinationParDefaut = (bloc.semaines[position + 1] ?? semaine).id;
-  const optionsSemaines = bloc.semaines
-    .map((s) => `<option value="${echapper(s.id)}"${s.id === destinationParDefaut ? ' selected' : ''}>Semaine ${formaterNombre(s.numero)}${s.id === semaine.id ? ' (celle-ci)' : ''}</option>`)
-    .join('');
 
   return {
     titre: jour.nom,
@@ -482,22 +418,6 @@ async function ecranJour([idBloc, idSemaine, idJour]) {
 
       <h2 class="titre-section">Exercices</h2>
       ${exercices}
-
-      <section class="carte">
-        <h2>Dupliquer ce jour</h2>
-        <div class="groupe">
-          <label class="etiquette" for="destination-jour">Vers la semaine</label>
-          <div class="choix">
-            <select id="destination-jour" class="champ">${optionsSemaines}</select>
-          </div>
-        </div>
-        <p class="texte-secondaire">La copie garde les exercices et les prescriptions, sans les séries réalisées.</p>
-        <button class="bouton bouton-secondaire bouton-large" type="button" data-action="dupliquer-jour" ${attributsCible(ids)}>Dupliquer le jour</button>
-      </section>
-
-      <div class="zone-danger">
-        <button class="bouton bouton-alerte bouton-large" type="button" data-action="supprimer-jour" ${attributsCible(ids)}>Supprimer ce jour</button>
-      </div>
     `,
     actions: boutonsBas(adresse.semaine(bloc.id, semaine.id), `<button class="bouton" type="button" data-action="ajouter-exercice" ${attributsCible(ids)}>+ Exercice</button>`),
   };
@@ -507,14 +427,6 @@ async function ecranJour([idBloc, idSemaine, idJour]) {
    6. Les actions des boutons
    Chaque action reçoit le bouton touché ; ses attributs data-… disent sur quoi agir.
    ========================================================================== */
-
-async function creerBloc() {
-  const nom = window.prompt('Nom du nouveau bloc :', 'Nouveau bloc');
-  if (nom === null) return;   // « Annuler »
-  const bloc = nouveauBloc(nom.trim() || 'Nouveau bloc');
-  await enregistrerBloc(bloc);
-  allerA(adresse.bloc(bloc.id));
-}
 
 async function supprimerLeBloc(bouton) {
   const bloc = await chargerBloc(bouton.dataset.bloc);
@@ -526,96 +438,6 @@ async function supprimerLeBloc(bouton) {
   await supprimerBloc(bloc.id);
   afficherMessage('Bloc supprimé');
   allerA(adresse.programme());
-}
-
-async function ajouterSemaine(bouton) {
-  const idBloc = bouton.dataset.bloc;
-  const semaine = await modifierBloc(idBloc, (bloc) => {
-    const nouvelle = nouvelleSemaine(numeroSuivant(bloc));
-    bloc.semaines.push(nouvelle);
-    return nouvelle;
-  });
-  afficherMessage(`Semaine ${semaine.numero} ajoutée`);
-  allerA(adresse.semaine(idBloc, semaine.id));
-}
-
-async function dupliquerSemaine(bouton) {
-  const { bloc: idBloc, semaine: idSemaine } = bouton.dataset;
-  const copie = await modifierBloc(idBloc, (bloc) => {
-    const { semaine } = localiser(bloc, idSemaine);
-    const numero = numeroSuivant(bloc);
-    const decalage = 7 * (numero - (semaine.numero ?? numero));
-    const nouvelle = copierSemaine(semaine, numero, decalage);
-    bloc.semaines.push(nouvelle);
-    return nouvelle;
-  });
-  afficherMessage(`Semaine ${copie.numero} créée`);
-  allerA(adresse.semaine(idBloc, copie.id));
-}
-
-async function supprimerLaSemaine(bouton) {
-  const { bloc: idBloc, semaine: idSemaine } = bouton.dataset;
-  const bloc = await chargerBloc(idBloc);
-  const { semaine } = localiser(bloc, idSemaine);
-  const total = compter([{ semaines: [semaine] }]);
-  const accord = window.confirm(
-    `Supprimer la semaine ${formaterNombre(semaine.numero)} (${resumeTotal(total)}) ?\n\nC’est définitif.`
-  );
-  if (!accord) return;
-  await modifierBloc(idBloc, (b) => {
-    b.semaines = b.semaines.filter((s) => s.id !== idSemaine);
-  });
-  afficherMessage('Semaine supprimée');
-  allerA(adresse.bloc(idBloc));
-}
-
-async function ajouterJour(bouton) {
-  const { bloc: idBloc, semaine: idSemaine } = bouton.dataset;
-  const bloc = await chargerBloc(idBloc);
-  const { semaine } = localiser(bloc, idSemaine);
-  const nomParDefaut = `J${semaine.jours.length + 1}`;
-  const nom = window.prompt('Nom du jour (ex. « J1 – Squat/Bench ») :', nomParDefaut);
-  if (nom === null) return;
-
-  const jour = await modifierBloc(idBloc, (b) => {
-    const { semaine: s } = localiser(b, idSemaine);
-    const nouveau = nouveauJour(nom.trim() || nomParDefaut);
-    s.jours.push(nouveau);
-    return nouveau;
-  });
-  allerA(adresse.jour(idBloc, idSemaine, jour.id));
-}
-
-async function dupliquerJour(bouton) {
-  const { bloc: idBloc, semaine: idSemaine, jour: idJour } = bouton.dataset;
-  const idDestination = document.getElementById('destination-jour').value;
-
-  const resultat = await modifierBloc(idBloc, (bloc) => {
-    const { semaine, jour } = localiser(bloc, idSemaine, idJour);
-    const destination = bloc.semaines.find((s) => s.id === idDestination);
-    if (!destination) throw new Error('La semaine de destination n’existe plus.');
-    const decalage = 7 * ((destination.numero ?? 0) - (semaine.numero ?? 0));
-    const copie = copierJour(jour, decalage);
-    if (destination.id === semaine.id) copie.nom = `${jour.nom} (copie)`;
-    destination.jours.push(copie);
-    return { copie, destination };
-  });
-
-  afficherMessage(`Copié dans la semaine ${formaterNombre(resultat.destination.numero)}`);
-  allerA(adresse.jour(idBloc, resultat.destination.id, resultat.copie.id));
-}
-
-async function supprimerLeJour(bouton) {
-  const { bloc: idBloc, semaine: idSemaine, jour: idJour } = bouton.dataset;
-  const bloc = await chargerBloc(idBloc);
-  const { jour } = localiser(bloc, idSemaine, idJour);
-  if (!window.confirm(`Supprimer le jour « ${jour.nom} » et ses ${pluriel(jour.exercices.length, 'exercice')} ?\n\nC’est définitif.`)) return;
-  await modifierBloc(idBloc, (b) => {
-    const { semaine } = localiser(b, idSemaine);
-    semaine.jours = semaine.jours.filter((j) => j.id !== idJour);
-  });
-  afficherMessage('Jour supprimé');
-  allerA(adresse.semaine(idBloc, idSemaine));
 }
 
 async function ajouterExercice(bouton) {
@@ -632,19 +454,6 @@ async function ajouterExercice(bouton) {
   });
   afficherMessage(`Ajouté (mouvement : ${MOUVEMENTS[exercice.mouvement]})`);
   signalerChangement(`exercice-${exercice.id}`);
-}
-
-/** Échange un exercice avec son voisin (sens -1 = monter, +1 = descendre). */
-async function deplacerExercice(bouton, sens) {
-  const { bloc: idBloc, semaine: idSemaine, jour: idJour, exercice: idExercice } = bouton.dataset;
-  await modifierBloc(idBloc, (bloc) => {
-    const { jour } = localiser(bloc, idSemaine, idJour);
-    const position = jour.exercices.findIndex((e) => e.id === idExercice);
-    const voisin = position + sens;
-    if (position < 0 || voisin < 0 || voisin >= jour.exercices.length) return;
-    [jour.exercices[position], jour.exercices[voisin]] = [jour.exercices[voisin], jour.exercices[position]];
-  });
-  signalerChangement(`exercice-${idExercice}`);
 }
 
 async function supprimerLExercice(bouton) {
@@ -674,17 +483,8 @@ export const ecransProgrammation = {
 };
 
 export const boutonsProgrammation = {
-  'nouveau-bloc': creerBloc,
   'supprimer-bloc': supprimerLeBloc,
-  'ajouter-semaine': ajouterSemaine,
-  'dupliquer-semaine': dupliquerSemaine,
-  'supprimer-semaine': supprimerLaSemaine,
-  'ajouter-jour': ajouterJour,
-  'dupliquer-jour': dupliquerJour,
-  'supprimer-jour': supprimerLeJour,
   'ajouter-exercice': ajouterExercice,
-  'monter-exercice': (bouton) => deplacerExercice(bouton, -1),
-  'descendre-exercice': (bouton) => deplacerExercice(bouton, +1),
   'supprimer-exercice': supprimerLExercice,
   ...boutonsImportCoach,   // « Importer un CSV… »
 };
