@@ -778,3 +778,121 @@ input.champ[type="date"]::-webkit-date-and-time-value {
     transition: none !important;
   }
 }
+
+/* ==========================================================================
+   Transitions entre écrans (v19) — View Transitions de Safari
+   Safari photographie l'écran d'avant, met le nouveau, puis anime de l'un à l'autre.
+   Le type de transition est écrit sur <html data-transition="…"> par js/navigation.js.
+   Rien n'est animé avec le réglage iPhone « Réduire les animations ».
+   ========================================================================== */
+
+:root {
+  --courbe: cubic-bezier(0.32, 0.72, 0, 1);   /* départ vif, arrivée douce (proche d'iOS) */
+  --duree-glisse: 0.3s;
+  --duree-fondu: 0.2s;
+  --duree-tuile: 0.42s;
+  --duree-menu: 0.18s;
+}
+
+/* La barre ⌂ ☰ ne bouge pas : elle a son propre calque (le logo et ⌂ se remplacent en fondu) ;
+   le menu aussi, pour s'effacer par-dessus */
+.barre-navigation { view-transition-name: barre; }
+.menu { view-transition-name: menu; }
+.menu-fond { view-transition-name: menu-fond; }
+::view-transition-group(barre) { animation-duration: var(--duree-fondu); z-index: 10; }
+::view-transition-group(menu-fond) { animation-duration: var(--duree-fondu); z-index: 11; }
+::view-transition-group(menu) { animation-duration: var(--duree-fondu); z-index: 12; }
+::view-transition-group(root) { animation-duration: var(--duree-glisse); }
+
+/* Vers l'avant : le nouvel écran arrive par la droite, l'ancien recule un peu à gauche */
+html[data-transition="avant"]::view-transition-old(root) {
+  animation: var(--duree-glisse) var(--courbe) both vt-recule;
+  mix-blend-mode: normal;
+}
+html[data-transition="avant"]::view-transition-new(root) {
+  animation: var(--duree-glisse) var(--courbe) both vt-arrive-droite;
+  mix-blend-mode: normal;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Retour : l'écran du dessus repart vers la droite, celui d'avant revient
+   (« geste » : la même chose, pilotée par le doigt depuis le bord gauche) */
+html[data-transition="arriere"]::view-transition-old(root),
+html[data-transition="geste"]::view-transition-old(root) {
+  animation: var(--duree-glisse) var(--courbe) both vt-repart-droite;
+  mix-blend-mode: normal;
+  z-index: 1;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.12);
+}
+html[data-transition="arriere"]::view-transition-new(root),
+html[data-transition="geste"]::view-transition-new(root) {
+  animation: var(--duree-glisse) var(--courbe) both vt-revient;
+  mix-blend-mode: normal;
+}
+/* Pendant le geste, la page suit le doigt exactement : pas de courbe.
+   (« (root) » est plus précis que « (*) » : il faut le nommer pour l'emporter.) */
+html[data-transition="geste"]::view-transition-old(root),
+html[data-transition="geste"]::view-transition-new(root),
+html[data-transition="geste"]::view-transition-group(*),
+html[data-transition="geste"]::view-transition-old(*),
+html[data-transition="geste"]::view-transition-new(*) {
+  animation-timing-function: linear;
+}
+
+@keyframes vt-arrive-droite { from { transform: translateX(100%); } }
+@keyframes vt-recule { to { transform: translateX(-30%); filter: brightness(0.93); } }
+@keyframes vt-repart-droite { to { transform: translateX(100%); } }
+@keyframes vt-revient { from { transform: translateX(-30%); filter: brightness(0.93); } }
+
+/* Par le menu ☰ : simple fondu, le nouvel écran se pose */
+html[data-transition="fondu"]::view-transition-group(root) { animation-duration: var(--duree-fondu); }
+html[data-transition="fondu"]::view-transition-old(root) { animation: var(--duree-fondu) ease both vt-disparait; }
+html[data-transition="fondu"]::view-transition-new(root) { animation: var(--duree-fondu) ease both vt-se-pose; }
+@keyframes vt-disparait { to { opacity: 0; } }
+@keyframes vt-se-pose { from { opacity: 0; transform: translateY(8px); } }
+
+/* Une tuile de l'accueil s'agrandit jusqu'à devenir la page (et rapetisse au retour par ⌂) */
+html[data-transition^="tuile"]::view-transition-group(tuile) {
+  animation-duration: var(--duree-tuile);
+  animation-timing-function: var(--courbe);
+  z-index: 5;
+}
+html[data-transition^="tuile"]::view-transition-image-pair(tuile) { overflow: clip; }
+html[data-transition="tuile"]::view-transition-image-pair(tuile) { animation: var(--duree-tuile) var(--courbe) both vt-tuile-ouvre; }
+html[data-transition="tuile-retour"]::view-transition-image-pair(tuile) { animation: var(--duree-tuile) var(--courbe) both vt-tuile-ferme; }
+html[data-transition^="tuile"]::view-transition-old(tuile),
+html[data-transition^="tuile"]::view-transition-new(tuile) { mix-blend-mode: normal; }
+html[data-transition="tuile"]::view-transition-old(tuile) { animation: calc(var(--duree-tuile) * 0.45) ease-out both vt-disparait; }
+html[data-transition="tuile-retour"]::view-transition-old(tuile) { animation: calc(var(--duree-tuile) * 0.55) ease-out both vt-disparait; }
+html[data-transition^="tuile"]::view-transition-new(tuile) { animation: var(--duree-tuile) linear both vt-apparait-apres; }
+html[data-transition^="tuile"]::view-transition-old(root),
+html[data-transition^="tuile"]::view-transition-new(root) { animation-duration: var(--duree-tuile); }
+
+/* --tuile-couleur : couleur de la tuile touchée (bleue pour Séance), posée par navigation.js */
+@keyframes vt-tuile-ouvre {
+  from { background: var(--tuile-couleur, var(--bleu)); border-radius: var(--arrondi-carte); }
+  to { background: var(--fond); border-radius: 0; }
+}
+@keyframes vt-tuile-ferme {
+  from { background: var(--fond); border-radius: 0; }
+  to { background: var(--tuile-couleur, var(--bleu)); border-radius: var(--arrondi-carte); }
+}
+@keyframes vt-apparait-apres { 0%, 30% { opacity: 0; } 100% { opacity: 1; } }
+
+/* Le menu ☰ s'ouvre en fondu depuis le bouton, et se ferme de même */
+.menu {
+  transform-origin: top right;
+  transition: opacity var(--duree-menu) ease, transform var(--duree-menu) var(--courbe);
+}
+.menu-fond { transition: opacity var(--duree-menu) ease; }
+@starting-style {
+  .menu { opacity: 0; transform: scale(0.92); }
+  .menu-fond { opacity: 0; }
+}
+.menu.se-ferme { opacity: 0; transform: scale(0.96); }
+.menu-fond.se-ferme { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .menu-fond { transition: none; }
+}
