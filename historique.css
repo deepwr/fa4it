@@ -1,6 +1,7 @@
 /* ==========================================================================
    FA 4 IT — historique.css
-   Styles de l'e1RM (onglet Historique et carte « e1RM de la séance »).
+   Styles de l'e1RM (page Suivi, section « Dans le bloc », et carte « e1RM de la séance »)
+   et, depuis la v18, de la page Historique (liste des séances faites).
    Aucune couleur ni aucun arrondi n'est écrit ici : tout vient des
    variables définies en haut de styles.css.
    ========================================================================== */
@@ -86,4 +87,121 @@
   position: sticky;
   left: 0;
   background: var(--carte);
+}
+
+/* --------------------------------------------------------------------------
+   Page Suivi : « Semaine par semaine » se replie (v18)
+   -------------------------------------------------------------------------- */
+
+.details-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--zone-tactile);
+  padding: 0 var(--espace-xs);
+  font-size: var(--taille-sous-titre);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.details-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.details-section > summary::after {
+  content: "›";
+  color: var(--texte-secondaire);
+  font-size: 28px;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.details-section[open] > summary::after {
+  transform: rotate(-90deg);
+}
+
+.details-section-contenu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-m);
+  margin-top: var(--espace-s);
+}
+
+/* --------------------------------------------------------------------------
+   Page Historique : les séances faites, groupées par mois (v18)
+   -------------------------------------------------------------------------- */
+
+.carte-mois {
+  gap: var(--espace-xs);
+}
+
+.liste-seances {
+  display: flex;
+  flex-direction: column;
+}
+
+.ligne-seance {
+  display: flex;
+  align-items: center;
+  gap: var(--espace-m);
+  min-height: 60px;
+  padding: var(--espace-s) 0;
+  color: var(--texte);
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.ligne-seance + .ligne-seance {
+  border-top: 1px solid var(--voile);
+}
+
+.ligne-seance:active {
+  opacity: 0.6;
+}
+
+/* Pastille de date : jour de la semaine + numéro */
+.date-seance {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--arrondi-champ);
+  background: var(--bleu-clair);
+  line-height: 1.1;
+}
+
+.date-seance-jour {
+  color: var(--texte-secondaire);
+  font-size: 12px;
+}
+
+.date-seance strong {
+  font-size: 19px;
+}
+
+.ligne-seance-texte {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ligne-seance .chevron {
+  font-size: 24px;
+}
+
+/* Texte lu par VoiceOver mais pas affiché */
+.visuellement-cache {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
