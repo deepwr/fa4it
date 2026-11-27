@@ -142,3 +142,115 @@
   background: var(--fond);
   font-size: var(--taille-petite);
 }
+
+/* --------------------------------------------------------------------------
+   Vitesse à charge égale (v15, voir js/vitesse.js)
+   -------------------------------------------------------------------------- */
+
+/* Carte de l'onglet : une ligne par exercice */
+.liste-vitesse {
+  display: flex;
+  flex-direction: column;
+}
+
+.ligne-vitesse {
+  display: flex;
+  align-items: center;
+  gap: var(--espace-s);
+  min-height: 56px;
+  padding: var(--espace-s) 0;
+  color: var(--texte);
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.ligne-vitesse + .ligne-vitesse {
+  border-top: 1px solid var(--voile);
+}
+
+.ligne-vitesse-texte {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ligne-vitesse-ecart {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ligne-vitesse .chevron {
+  font-size: 22px;
+}
+
+/* Choix du rang de série : pilules (comme la période) */
+.rangs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espace-s);
+}
+
+.puce-rang {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--zone-tactile);
+  padding: 0 var(--espace-m);
+  text-decoration: none;
+}
+
+/* Courbe de la moyenne à charge égale : bleu */
+.courbe-vitesse {
+  fill: none;
+  stroke: var(--bleu);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.rond-vitesse {
+  fill: var(--bleu);
+  stroke: var(--carte);
+  stroke-width: 2;
+}
+
+.rond-vitesse.choisi {
+  stroke: var(--texte);
+  stroke-width: 1.5;
+}
+
+/* Tableau Date · Séance · Moyenne · Perte */
+.tableau-vitesse {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--taille-petite);
+  font-variant-numeric: tabular-nums;
+}
+
+.tableau-vitesse th {
+  padding: var(--espace-xs) 4px;
+  color: var(--texte-secondaire);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.tableau-vitesse td {
+  padding: 0 4px;
+  border-top: 1px solid var(--voile);
+}
+
+.tableau-vitesse .nombre {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tableau-vitesse .fort {
+  font-weight: 700;
+}
+
+.tableau-vitesse .lien {
+  font-weight: 600;
+}

@@ -250,3 +250,159 @@
 .serie.faite .serie-vbt .bouton-secondaire {
   background: var(--carte);
 }
+
+/* --------------------------------------------------------------------------
+   Série mesurée : une seule ligne qui ouvre le détail (v15, voir js/vitesse.js)
+   -------------------------------------------------------------------------- */
+
+.lien-vitesse {
+  display: flex;
+  align-items: center;
+  gap: var(--espace-s);
+  min-height: var(--zone-tactile);
+  padding: var(--espace-s) var(--espace-m);
+  border-radius: var(--arrondi-champ);
+  background: var(--fond);
+  color: var(--texte);
+  text-decoration: none;
+  touch-action: manipulation;
+  transition: transform 0.1s ease;
+}
+
+.lien-vitesse:active {
+  transform: scale(0.98);
+}
+
+/* Sur une série faite (fond bleu clair), la ligne passe en blanc */
+.serie.faite .lien-vitesse {
+  background: var(--carte);
+}
+
+.lien-vitesse-texte {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.lien-vitesse-texte strong {
+  font-size: var(--taille-petite);
+}
+
+.lien-vitesse .chevron {
+  font-size: 24px;
+}
+
+/* --------------------------------------------------------------------------
+   Détail d'une série (#/serie/…)
+   -------------------------------------------------------------------------- */
+
+.entete-carte-vitesse {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Barres des reps : bleu ; la 1re (référence) en bleu plus soutenu ;
+   trait pointillé à sa hauteur pour voir la perte d'un coup d'œil */
+.graphique-reps {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.graphique-reps .grille {
+  stroke: var(--bordure);
+  stroke-width: 1;
+}
+
+.barre-rep {
+  fill: var(--bleu);
+}
+
+.barre-reference {
+  fill: var(--bleu-presse);
+}
+
+.trait-reference {
+  stroke: var(--texte);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 4;
+}
+
+.valeur-rep {
+  fill: var(--texte);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.graphique-reps .axe {
+  fill: var(--texte-secondaire);
+  font-size: 11px;
+}
+
+/* Deux tuiles : perte de vitesse et moyenne */
+.tuiles-vitesse {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espace-s);
+}
+
+.tuile-vitesse {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--espace-s) var(--espace-m);
+  border-radius: var(--arrondi-champ);
+  background: var(--fond);
+}
+
+.etiquette-tuile {
+  color: var(--texte-secondaire);
+  font-size: 13px;
+}
+
+.tuile-valeur {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.tuile-vitesse .texte-secondaire {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Comparaison à charge égale : aujourd'hui, puis la séance précédente */
+.lignes-comparaison p {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--espace-s);
+  padding: var(--espace-s) 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.lignes-comparaison p + p {
+  border-top: 1px solid var(--voile);
+}
+
+.ecart-vitesse {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--espace-s);
+}
+
+.ecart-vitesse strong {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Morceau de texte qui ne se coupe pas (ex. « 09/11 vs 02/11 ») */
+.insecable {
+  white-space: nowrap;
+}
