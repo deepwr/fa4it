@@ -189,7 +189,7 @@ function normaliserMesureVbt(brute) {
     const y = points(trace.y);
     if (x.length > 0 && x.length === y.length) trajectoire = { pas: trace.pas, x, y };
   }
-  return {
+  const mesure = {
     date: lireTexte(brute.date) || null,
     disque: nombre(brute.disque),
     angle: nombre(brute.angle) ?? 0,
@@ -197,6 +197,12 @@ function normaliserMesureVbt(brute) {
     reps,
     trajectoire,
   };
+  // v17 : dans l'app, la trajectoire est rangée à part ; la mesure garde son numéro
+  if (typeof brute.trace === 'string' && brute.trace) {
+    mesure.trace = brute.trace;
+    if (!trajectoire) delete mesure.trajectoire;   // elle est dans le magasin « traces »
+  }
+  return mesure;
 }
 
 /** Case d'origine dans le Sheets du coach (numéros à partir de 0), ou null. */

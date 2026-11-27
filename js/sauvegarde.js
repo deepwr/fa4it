@@ -5,8 +5,8 @@
 // Fournit aussi le rappel de sauvegarde affiché dans l'onglet Séance.
 
 import {
-  lireBlocs, remplacerTousLesBlocs, lireReglage, ecrireReglage, etatStockage,
-  garderCopieDeSecours, lireCopieDeSecours, supprimerCopieDeSecours, restaurerCopieDeSecours,
+  lireBlocs, lireBlocsComplets, remplacerTousLesBlocs, lireReglage, ecrireReglage, etatStockage,
+  garderCopieDeSecours, lireResumeCopie, supprimerCopieDeSecours, restaurerCopieDeSecours,
 } from './db.js';
 import { compter, construireSauvegarde, lireSauvegarde } from './modele.js';
 import { carteReglageSheets, boutonsSheets, changementsSheets } from './sheets.js';
@@ -14,10 +14,48 @@ import { afficherMessage, pluriel, formaterDateHeure, formaterTaille } from './u
 
 const JOURS_AVANT_RAPPEL = 7;   // au-delà, l'app vous rappelle d'exporter
 
-// Le fichier de sauvegarde est préparé dès l'ouverture de l'écran. Ainsi,
-// l'appui sur « Exporter » ouvre immédiatement la feuille de partage d'iOS,
-// qui n'accepte de s'ouvrir que juste après un appui.
+// Le fichier de sauvegarde est préparé juste après l'affichage de l'écran (v17 : plus avant,
+// l'écran s'affiche donc tout de suite). Ainsi, l'appui sur « Exporter » ouvre immédiatement
+// la feuille de partage d'iOS, qui n'accepte de s'ouvrir que juste après un appui.
 let fichierPret = null;
+let preparation = null;
+
+/**
+ * Prépare le fichier d'export : toutes les données, trajectoires des mesures vidéo comprises.
+ * Texte compact (sans retours à la ligne) : le fichier est environ deux fois plus léger.
+ */
+function preparerExport() {
+  fichierPret = null;
+  const nom = nomDeFichier();
+  preparation = (async () => {
+    let contenu;
+    try {
+      contenu = await preparerEnArrierePlan();   // l'écran reste fluide
+    } catch (erreur) {
+      console.warn('Export préparé sans worker :', erreur);
+      contenu = JSON.stringify(construireSauvegarde(await lireBlocsComplets()));
+    }
+    fichierPret = new File([contenu], nom, { type: 'application/json' });
+    return fichierPret;
+  })();
+  preparation.catch((erreur) => console.error('Préparation de l’export :', erreur));
+  return preparation;
+}
+
+/** Fait préparer le fichier par js/export-worker.js, sur un autre fil que l'écran. */
+function preparerEnArrierePlan() {
+  return new Promise((resoudre, rejeter) => {
+    const travailleur = new Worker(new URL('./export-worker.js', import.meta.url), { type: 'module' });
+    travailleur.onmessage = ({ data }) => {
+      travailleur.terminate();
+      if (data?.blob) resoudre(data.blob); else rejeter(new Error(data?.erreur ?? 'Préparation impossible.'));
+    };
+    travailleur.onerror = (evenement) => {
+      travailleur.terminate();
+      rejeter(new Error(evenement.message || 'Worker indisponible.'));
+    };
+  });
+}
 
 /* --------------------------------------------------------------------------
    Petits outils
@@ -100,7 +138,7 @@ function carteCopieDeSecours(copie) {
   return `
     <section class="carte">
       <h2>Copie de secours</h2>
-      <p>Copie automatique du ${formaterDateHeure(copie.date)}, faite avant ${copie.raison} : ${resumeDonnees(compter(copie.blocs))}.</p>
+      <p>Copie automatique du ${formaterDateHeure(copie.date)}, faite avant ${copie.raison} : ${resumeDonnees(copie.total)}.</p>
       <p class="texte-secondaire">L’app garde une copie juste avant chaque import ou effacement. Elle vous protège d’une fausse manœuvre, pas de la perte de l’iPhone : pour cela, seul l’export compte.</p>
       <button class="bouton bouton-secondaire bouton-large" type="button" data-action="restaurer-copie">Revenir à cette copie</button>
       <button class="bouton bouton-secondaire bouton-large" type="button" data-action="supprimer-copie">Supprimer la copie</button>
@@ -112,13 +150,13 @@ export async function ecranSauvegarde() {
   const blocs = await lireBlocs();
   const total = compter(blocs);
   const derniere = await lireReglage('derniereSauvegarde');
-  const copie = await lireCopieDeSecours();
+  const copie = await lireResumeCopie();
   const stockage = await etatStockage();
   const version = await versionInstallee();
 
-  // JSON.stringify(…, null, 2) : texte indenté, lisible par un humain
-  const contenu = JSON.stringify(construireSauvegarde(blocs), null, 2);
-  fichierPret = new File([contenu], nomDeFichier(), { type: 'application/json' });
+  // Le fichier d'export se prépare juste après l'affichage
+  fichierPret = null;
+  setTimeout(preparerExport, 300);
 
   const rappel = total.blocs > 0 && joursDepuis(derniere) > JOURS_AVANT_RAPPEL;
 
@@ -200,8 +238,7 @@ function telecharger(fichier) {
 }
 
 async function exporter() {
-  if (!fichierPret) return;
-  const fichier = fichierPret;
+  const fichier = fichierPret ?? await (preparation ?? preparerExport());
 
   // Sur un écran tactile (iPhone), on ouvre la feuille de partage d'iOS.
   const ecranTactile = window.matchMedia('(pointer: coarse)').matches;
@@ -268,11 +305,11 @@ async function chargerExemple() {
 }
 
 async function restaurerCopie() {
-  const copie = await lireCopieDeSecours();
+  const copie = await lireResumeCopie();
   if (!copie) return;
   const actuel = compter(await lireBlocs());
   const accord = window.confirm(
-    `Revenir à la copie du ${formaterDateHeure(copie.date)} (${resumeDonnees(compter(copie.blocs))}) ?\n\n` +
+    `Revenir à la copie du ${formaterDateHeure(copie.date)} (${resumeDonnees(copie.total)}) ?\n\n` +
     `Les données actuelles (${resumeDonnees(actuel)}) deviendront la nouvelle copie de secours : vous pourrez y revenir.`
   );
   if (!accord) return;
