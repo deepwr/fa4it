@@ -370,7 +370,7 @@ async function ecranProgramme() {
   const blocs = await lireBlocs();
   const liste = blocs.length > 0
     ? blocs.map(carteBloc).join('')
-    : carteVide('Aucun bloc pour l’instant', 'Importez le programme du coach, créez un bloc avec le bouton ci-dessous, ou chargez l’exemple depuis l’onglet Sauvegarde.');
+    : carteVide('Aucun bloc pour l’instant', 'Importez le programme du coach, créez un bloc avec le bouton ci-dessous, ou chargez l’exemple depuis la page Sauvegarde.');
   return {
     titre: 'Programme',
     html: liste + carteImportCoach(),

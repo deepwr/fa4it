@@ -304,7 +304,7 @@ async function ecranSuivi() {
   if (blocs.length === 0) {
     return {
       titre: 'Suivi',
-      html: carteVide('Pas encore de données', 'Créez un bloc dans l’onglet Programme, ou chargez l’exemple depuis l’onglet Sauvegarde.'),
+      html: carteVide('Pas encore de données', 'Créez un bloc dans la page Programme, ou chargez l’exemple depuis la page Sauvegarde.'),
     };
   }
 

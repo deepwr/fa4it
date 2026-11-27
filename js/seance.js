@@ -190,7 +190,7 @@ async function ecranListe() {
   if (blocs.length === 0) {
     return {
       titre: 'Séance',
-      html: carteVide('Aucun programme', 'Créez un bloc dans l’onglet Programme, ou chargez l’exemple depuis l’onglet Sauvegarde.'),
+      html: carteVide('Aucun programme', 'Créez un bloc dans la page Programme, ou chargez l’exemple depuis la page Sauvegarde.'),
     };
   }
 
@@ -422,7 +422,7 @@ async function ecranSaisie([idBloc, idSemaine, idJour]) {
   const prevu = jour.datePrevue ? ` · prévu le ${formaterDate(jour.datePrevue)}` : '';
   const exercices = jour.exercices.length > 0
     ? jour.exercices.map((exercice) => carteExerciceSeance(ids, exercice, vitesses)).join('')
-    : carteVide('Aucun exercice', 'Ajoutez des exercices à ce jour dans l’onglet Programme.');
+    : carteVide('Aucun exercice', 'Ajoutez des exercices à ce jour dans la page Programme.');
 
   return {
     titre: jour.nom,

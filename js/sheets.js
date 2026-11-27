@@ -112,7 +112,7 @@ export function lignesDuJour(jour) {
 async function appeler(options = {}) {
   const adresse = await adresseComplete();
   if (!adresse) {
-    throw new Error('Le lien avec le Google Sheets n’est pas encore réglé : onglet Sauvegarde › Google Sheets du coach.');
+    throw new Error('Le lien avec le Google Sheets n’est pas encore réglé : page Sauvegarde › Google Sheets du coach.');
   }
   if (navigator.onLine === false) {
     throw new Error('Pas de réseau : réessayez une fois connectée.');

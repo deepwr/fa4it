@@ -1,7 +1,8 @@
 // FA 4 IT — js/app.js
 // Point d'entrée de l'application.
 // Rôle : lire l'adresse (la partie après le « # »), afficher l'écran
-// correspondant, allumer le bon onglet et réagir aux boutons et aux champs.
+// correspondant, gérer le menu ☰ et le bouton ⌂, et réagir aux boutons et aux champs.
+// v16 : plus de barre d'onglets en bas ; l'app s'ouvre sur l'accueil (voir accueil.js).
 
 // « import » récupère des fonctions écrites dans d'autres fichiers (des modules).
 import { carteErreur } from './ui.js';
@@ -13,10 +14,11 @@ import { ecransLabo, boutonsLabo, changementsLabo } from './labo-vbt.js';
 import { ecransHistorique, changementsHistorique } from './historique.js';
 import { ecransVitesse, boutonsVitesse, changementsVitesse } from './vitesse.js';
 import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sauvegarde.js';
+import { ecransAccueil } from './accueil.js';
 
 /* --------------------------------------------------------------------------
    1. La liste des écrans
-   Chaque écran indique l'onglet à allumer et une fonction « afficher »
+   Chaque écran indique la page à allumer dans le menu (onglet) et une fonction « afficher »
    qui renvoie { titre, html, actions } :
    - titre   : le grand titre en haut ;
    - html    : le contenu de l'écran ;
@@ -24,6 +26,7 @@ import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sau
    -------------------------------------------------------------------------- */
 
 const ecrans = {
+  ...ecransAccueil,         // accueil : verset du jour et tuiles (voir accueil.js)
   ...ecransProgrammation,   // programme, bloc, semaine, jour (voir programmation.js)
   ...ecransSeance,          // seance (voir seance.js)
   ...ecransSuivi,           // suivi (voir suivi.js)
@@ -50,24 +53,55 @@ function lireAdresse() {
     .replace(/^#\/?/, '')   // enlève le « # » et le « / » du début
     .split('/')             // coupe aux « / »
     .filter(Boolean);       // retire les morceaux vides
-  return { nom: morceaux[0] || 'programme', parametres: morceaux.slice(1) };
+  return { nom: morceaux[0] || 'accueil', parametres: morceaux.slice(1) };
 }
 
 /* --------------------------------------------------------------------------
    3. Afficher l'écran demandé
    -------------------------------------------------------------------------- */
 
-function allumerOnglet(nomOnglet) {
-  for (const onglet of document.querySelectorAll('.onglet')) {
-    const actif = onglet.dataset.onglet === nomOnglet;
-    onglet.classList.toggle('actif', actif);
-    if (actif) {
-      onglet.setAttribute('aria-current', 'page');
+/** Allume la page en cours dans le menu ; sur l'accueil, le logo remplace le bouton ⌂. */
+function allumerPage(nomPage) {
+  for (const lien of document.querySelectorAll('.menu-lien')) {
+    if (lien.dataset.page === nomPage) {
+      lien.setAttribute('aria-current', 'page');
     } else {
-      onglet.removeAttribute('aria-current');
+      lien.removeAttribute('aria-current');
     }
   }
+  const surAccueil = nomPage === 'accueil';
+  document.body.classList.toggle('page-accueil', surAccueil);
+  document.getElementById('bouton-accueil').hidden = surAccueil;
+  document.getElementById('marque').hidden = !surAccueil;
 }
+
+/* --------------------------------------------------------------------------
+   Le menu ☰
+   -------------------------------------------------------------------------- */
+
+function ouvrirMenu() {
+  document.getElementById('menu').hidden = false;
+  document.getElementById('menu-fond').hidden = false;
+  document.getElementById('bouton-menu').setAttribute('aria-expanded', 'true');
+  // On place le focus sur la page en cours (ou la première) : pratique au clavier et avec VoiceOver
+  const menu = document.getElementById('menu');
+  (menu.querySelector('.menu-lien[aria-current="page"]') ?? menu.querySelector('.menu-lien'))?.focus();
+}
+
+function fermerMenu({ rendreLeFocus = false } = {}) {
+  const menu = document.getElementById('menu');
+  if (menu.hidden) return;
+  menu.hidden = true;
+  document.getElementById('menu-fond').hidden = true;
+  const bouton = document.getElementById('bouton-menu');
+  bouton.setAttribute('aria-expanded', 'false');
+  if (rendreLeFocus) bouton.focus();
+}
+
+// Touche Échap (clavier) : ferme le menu
+document.addEventListener('keydown', (evenement) => {
+  if (evenement.key === 'Escape') fermerMenu({ rendreLeFocus: true });
+});
 
 // Numéro du dernier affichage demandé : si l'on change d'écran pendant qu'un
 // écran lit encore ses données, on ignore le résultat devenu inutile.
@@ -81,8 +115,9 @@ let dernierAffichage = 0;
 async function afficherEcran(evenement) {
   const numero = ++dernierAffichage;
   const { nom, parametres } = lireAdresse();
-  const ecran = ecrans[nom] || ecrans.programme;
-  allumerOnglet(ecran.onglet);
+  const ecran = ecrans[nom] || ecrans.accueil;
+  fermerMenu();
+  allumerPage(ecran.onglet);
 
   let vue;
   try {
@@ -92,7 +127,7 @@ async function afficherEcran(evenement) {
     vue = {
       titre: 'Oups',
       html: carteErreur(erreur),
-      actions: '<a class="bouton bouton-secondaire" href="#/programme">Retour au programme</a>',
+      actions: '<a class="bouton bouton-secondaire" href="#/accueil">Retour à l’accueil</a>',
     };
   }
   if (numero !== dernierAffichage) return;   // un autre écran a été demandé entre-temps
@@ -121,6 +156,8 @@ async function afficherEcran(evenement) {
    -------------------------------------------------------------------------- */
 
 const actionsBoutons = {
+  'menu-ouvrir': ouvrirMenu,
+  'menu-fermer': () => fermerMenu({ rendreLeFocus: true }),
   ...boutonsProgrammation,   // « ... » ajoute ici toutes les actions de programmation.js
   ...boutonsSeance,
   ...boutonsSuivi,
@@ -157,6 +194,11 @@ document.addEventListener('click', (evenement) => {
   if (action) lancer(action, bouton);
 });
 
+// Un lien du menu ferme le menu, même s'il mène à la page déjà ouverte.
+document.addEventListener('click', (evenement) => {
+  if (evenement.target.closest('.menu-lien')) fermerMenu();
+});
+
 // Même principe pour les champs dont la valeur change. L'événement « change »
 // part quand on quitte un champ modifié (ou qu'on choisit un fichier, une date…).
 document.addEventListener('change', (evenement) => {
@@ -174,6 +216,12 @@ document.addEventListener('change', (evenement) => {
 // ou quand des données sont modifiées, on réaffiche l'écran.
 window.addEventListener('hashchange', afficherEcran);
 window.addEventListener('donnees-modifiees', afficherEcran);
+
+// Au lancement, l'app s'ouvre sur l'accueil. L'iPhone ouvre l'adresse enregistrée
+// à l'installation (« #/seance ») : on la remplace, sans créer d'étape « retour ».
+if (['', '#', '#/', '#/seance'].includes(location.hash)) {
+  history.replaceState(null, '', '#/accueil');
+}
 
 // Premier affichage au lancement de l'app
 afficherEcran();
