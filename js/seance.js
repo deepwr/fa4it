@@ -20,6 +20,7 @@ import { calculerE1rm, seriesDuJour, htmlResultats, compteDansE1rm } from './e1r
 import { proposerRampUp } from './echauffement.js';
 import { proposerEnvoiApresSeance } from './sheets.js';
 import { indexDesVitesses, ligneVitesseSeance, aUneVideo } from './vitesse.js';
+import { allerA } from './navigation.js';
 
 /* ==========================================================================
    1. Règles de saisie
@@ -671,7 +672,7 @@ async function terminerSeance(bouton) {
   });
   afficherMessage(`Séance terminée : ${faites}/${total} séries faites`);
   await proposerEnvoiApresSeance(idBloc, idJour);   // si le lien avec le Google Sheets est réglé
-  location.hash = '#/seance';
+  allerA('#/seance');   // v19 : retour à la liste (en arrière si l'on en vient)
 }
 
 async function choisirBloc(liste) {

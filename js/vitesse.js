@@ -17,6 +17,7 @@
 
 import { lireBlocs, lireBloc } from './db.js';
 import { echapper, carteVide, pluriel, formaterNombre } from './ui.js';
+import { allerA, remplacerAdresse } from './navigation.js';
 
 /* ==========================================================================
    1. Petits outils
@@ -438,7 +439,9 @@ async function ecranDetail([idBloc, idSemaine, idJour, idExercice, liste = 'seri
     actions: `
       <button class="bouton bouton-secondaire bouton-retour" type="button" data-action="vitesse-retour-seance"
         data-bloc="${echapper(idBloc)}" data-semaine="${echapper(idSemaine)}" data-jour="${echapper(idJour)}"
-        data-exercice="${echapper(idExercice)}" data-liste="${echapper(liste)}" data-serie="${index}">‹ Séance</button>
+        data-exercice="${echapper(idExercice)}" data-liste="${echapper(liste)}" data-serie="${index}"
+        data-adresse="${echapper(`#/seance/${idBloc}/${idSemaine}/${idJour}`)}"
+        data-ligne="${echapper(`${liste === 'series' ? 'serie' : 'echauffement'}-${idExercice}-${index}`)}">‹ Séance</button>
       ${exercice.mouvement === 'autre' ? '' : `<a class="bouton" href="${echapper(adresseMesure)}">${reps.length > 0 ? 'Remesurer en vidéo' : 'Mesurer en vidéo'}</a>`}
     `,
   };
@@ -448,7 +451,7 @@ async function ecranDetail([idBloc, idSemaine, idJour, idExercice, liste = 'seri
 async function retourSeance(bouton) {
   const { bloc, semaine, jour, exercice, liste, serie } = bouton.dataset;
   const idCible = `${liste === 'series' ? 'serie' : 'echauffement'}-${exercice}-${serie}`;   // comme dans seance.js
-  location.hash = `#/seance/${bloc}/${semaine}/${jour}`;
+  allerA(`#/seance/${bloc}/${semaine}/${jour}`);   // v19 : en arrière si l'on en vient
   // L'écran de séance se dessine juste après : on attend la ligne, puis on l'amène au centre.
   for (let essai = 0; essai < 60; essai += 1) {
     await new Promise((resoudre) => setTimeout(resoudre, 50));
@@ -622,7 +625,7 @@ async function ecranEvolution([nomEncode = '', chargeTexte = '', rangTexte = '']
   }).join('');
   const adresse = (r) => `#/vitesse/${encodeURIComponent(nomAffiche)}/${charge}/${r}`;
   const pilules = rangs.map((r) => `
-    <a class="puce-periode puce-rang${r === rang ? ' active' : ''}" href="${echapper(adresse(r))}"${r === rang ? ' aria-current="true"' : ''}>${r === 0 ? 'Last warm-up' : r}</a>`).join('');
+    <a class="puce-periode puce-rang${r === rang ? ' active' : ''}" href="${echapper(adresse(r))}" data-remplacer${r === rang ? ' aria-current="true"' : ''}>${r === 0 ? 'Last warm-up' : r}</a>`).join('');
 
   let resume = '';
   if (points.length > 1) {
@@ -674,7 +677,7 @@ async function ecranEvolution([nomEncode = '', chargeTexte = '', rangTexte = '']
 
 /** Choix d'une autre charge : on garde l'exercice, le rang est choisi par l'écran. */
 function choisirCharge(liste) {
-  location.hash = `#/vitesse/${encodeURIComponent(liste.dataset.nom)}/${liste.value}`;
+  remplacerAdresse(`#/vitesse/${encodeURIComponent(liste.dataset.nom)}/${liste.value}`);   // v19 : même écran, sans nouvelle étape
 }
 
 /** « ‹ Retour » : écran précédent (détail d'une série ou onglet Suivi). */

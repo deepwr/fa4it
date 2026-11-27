@@ -20,6 +20,7 @@ import {
   MOUVEMENTS, OBJECTIFS, compter, lireNombre, devinerMouvement, estFormatCompetition, nouvelExercice,
 } from './modele.js';
 import { boutonsImportCoach, changementsImportCoach } from './import-coach.js';
+import { allerA as allerVers } from './navigation.js';
 import {
   echapper, carteVide, afficherMessage, pluriel, formaterDate,
   formaterNombre, arrondirAuDemi, majusculeInitiale,
@@ -37,7 +38,7 @@ const adresse = {
 };
 
 function allerA(nouvelleAdresse) {
-  location.hash = nouvelleAdresse;
+  allerVers(nouvelleAdresse);   // v19 : en arrière si c'est l'écran d'où l'on vient
 }
 
 /**

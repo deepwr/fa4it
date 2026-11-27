@@ -14,6 +14,7 @@ import {
 } from './vbt-analyse.js';
 import { lireBloc, modifierBloc, lireReglage, ecrireReglage } from './db.js';
 import { echapper, afficherMessage, pluriel, formaterNombre } from './ui.js';
+import { allerA as allerVers } from './navigation.js';
 
 const DISQUES = [
   { valeur: '0.45', libelle: '45 cm (20-25 kg ou bumper)' },
@@ -177,7 +178,12 @@ async function ecranMesure([idBloc, idSemaine, idJour, idExercice, liste = 'seri
 
 /** Boutons du bas de l'écran de mesure : retour, et « Remplir » une fois la vitesse connue. */
 function actionsMesure(vitesse = null) {
-  const retour = '<button class="bouton bouton-secondaire bouton-retour" type="button" data-action="vbt-retour">‹ Séance</button>';
+  // v19 : data-adresse (la séance) et data-ligne (la série) servent au retour par l'historique (navigation.js)
+  const c = etat.cible;
+  const reperes = c
+    ? ` data-adresse="${echapper(`#/seance/${c.bloc}/${c.semaine}/${c.jour}`)}" data-ligne="${echapper(`${c.liste === 'series' ? 'serie' : 'echauffement'}-${c.exercice}-${c.index}`)}"`
+    : '';
+  const retour = `<button class="bouton bouton-secondaire bouton-retour" type="button" data-action="vbt-retour"${reperes}>‹ Séance</button>`;
   return vitesse === null ? retour : `${retour}<button class="bouton" type="button" data-action="vbt-remplir">Remplir : ${format(vitesse)} m/s</button>`;
 }
 
@@ -810,12 +816,12 @@ async function remplir() {
 async function retourSeance() {
   const cible = etat.cible;
   if (!cible) {
-    location.hash = '#/seance';
+    allerVers('#/seance');
     return;
   }
   // Même identifiant que la ligne dans seance.js
   const idCible = `${cible.liste === 'series' ? 'serie' : 'echauffement'}-${cible.exercice}-${cible.index}`;
-  location.hash = `#/seance/${cible.bloc}/${cible.semaine}/${cible.jour}`;
+  allerVers(`#/seance/${cible.bloc}/${cible.semaine}/${cible.jour}`);   // v19 : en arrière si l'on en vient
   // L'écran de séance se dessine juste après : on attend la ligne, puis on l'amène au centre.
   for (let essai = 0; essai < 60; essai += 1) {
     await new Promise((resoudre) => setTimeout(resoudre, 50));

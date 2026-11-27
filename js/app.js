@@ -3,6 +3,7 @@
 // Rôle : lire l'adresse (la partie après le « # »), afficher l'écran
 // correspondant, gérer le menu ☰ et le bouton ⌂, et réagir aux boutons et aux champs.
 // v16 : plus de barre d'onglets en bas ; l'app s'ouvre sur l'accueil (voir accueil.js).
+// v19 : transitions entre écrans, bouton ‹ et geste de retour (voir navigation.js).
 
 // « import » récupère des fonctions écrites dans d'autres fichiers (des modules).
 import { carteErreur } from './ui.js';
@@ -14,6 +15,10 @@ import { ecransHistorique, changementsHistorique } from './historique.js';
 import { ecransVitesse, boutonsVitesse, changementsVitesse } from './vitesse.js';
 import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sauvegarde.js';
 import { ecransAccueil } from './accueil.js';
+import {
+  demarrerPile, noterChangementAdresse, noterTitre, restaurerPositionCourante, jouerTransition,
+  preparerBoutonRetour, configurerNavigation, attendreFinGeste, sansAnimation,
+} from './navigation.js';
 
 /* --------------------------------------------------------------------------
    1. La liste des écrans
@@ -49,8 +54,8 @@ const ecrans = {
    Exemple : « #/seance/a/b/c » donne { nom: 'seance', parametres: ['a', 'b', 'c'] }.
    -------------------------------------------------------------------------- */
 
-function lireAdresse() {
-  const morceaux = location.hash
+function lireAdresse(adresse = location.hash) {
+  const morceaux = adresse
     .replace(/^#\/?/, '')   // enlève le « # » et le « / » du début
     .split('/')             // coupe aux « / »
     .filter(Boolean);       // retire les morceaux vides
@@ -80,22 +85,41 @@ function allumerPage(nomPage) {
    Le menu ☰
    -------------------------------------------------------------------------- */
 
+let minuteurMenu;
+
 function ouvrirMenu() {
-  document.getElementById('menu').hidden = false;
-  document.getElementById('menu-fond').hidden = false;
+  clearTimeout(minuteurMenu);
+  for (const id of ['menu', 'menu-fond']) {
+    document.getElementById(id).classList.remove('se-ferme');
+    document.getElementById(id).hidden = false;   // il apparaît en fondu (styles.css)
+  }
   document.getElementById('bouton-menu').setAttribute('aria-expanded', 'true');
   // On place le focus sur la page en cours (ou la première) : pratique au clavier et avec VoiceOver
   const menu = document.getElementById('menu');
   (menu.querySelector('.menu-lien[aria-current="page"]') ?? menu.querySelector('.menu-lien'))?.focus();
 }
 
-function fermerMenu({ rendreLeFocus = false } = {}) {
+/** Ferme le menu : en fondu (0,18 s), ou tout de suite quand on change d'écran. */
+function fermerMenu({ rendreLeFocus = false, toutDeSuite = false } = {}) {
   const menu = document.getElementById('menu');
+  const fond = document.getElementById('menu-fond');
   if (menu.hidden) return;
-  menu.hidden = true;
-  document.getElementById('menu-fond').hidden = true;
   const bouton = document.getElementById('bouton-menu');
   bouton.setAttribute('aria-expanded', 'false');
+  const cacher = () => {
+    for (const element of [menu, fond]) {
+      element.hidden = true;
+      element.classList.remove('se-ferme');
+    }
+  };
+  clearTimeout(minuteurMenu);
+  if (toutDeSuite || sansAnimation()) {
+    cacher();
+  } else {
+    menu.classList.add('se-ferme');
+    fond.classList.add('se-ferme');
+    minuteurMenu = setTimeout(cacher, 180);
+  }
   if (rendreLeFocus) bouton.focus();
 }
 
@@ -108,46 +132,76 @@ document.addEventListener('keydown', (evenement) => {
 // écran lit encore ses données, on ignore le résultat devenu inutile.
 let dernierAffichage = 0;
 
-/**
- * « evenement » dit pourquoi on affiche :
- * - changement d'adresse : on remonte en haut de l'écran ;
- * - données modifiées : on garde la position, ou on amène un élément précis à l'écran.
- */
-async function afficherEcran(evenement) {
-  const numero = ++dernierAffichage;
-  const { nom, parametres } = lireAdresse();
+/** Lit les données d'un écran et prépare son contenu, sans rien changer à l'écran. */
+async function preparerVue(adresse) {
+  const { nom, parametres } = lireAdresse(adresse);
   const ecran = ecrans[nom] || ecrans.accueil;
-  fermerMenu();
-  allumerPage(ecran.onglet);
-
-  let vue;
   try {
-    vue = await ecran.afficher(parametres);
+    return await ecran.afficher(parametres);
   } catch (erreur) {
     console.error(erreur);
-    vue = {
+    return {
       titre: 'Oups',
       html: carteErreur(erreur),
       actions: '<a class="bouton bouton-secondaire" href="#/accueil">Retour à l’accueil</a>',
     };
   }
-  if (numero !== dernierAffichage) return;   // un autre écran a été demandé entre-temps
+}
 
+/** Allume dans le menu la page d'une adresse (et ⌂ ou le logo). */
+function allumerAdresse(adresse) {
+  const { nom } = lireAdresse(adresse);
+  allumerPage((ecrans[nom] || ecrans.accueil).onglet);
+}
+
+/** Met un contenu préparé à l'écran. */
+function appliquerVue(vue, adresse) {
+  allumerAdresse(adresse);
   document.title = `${vue.titre} · FA 4 IT`;
   document.getElementById('titre').textContent = vue.titre;
   document.getElementById('ecran').innerHTML = vue.html;
-
   const htmlActions = vue.actions ?? '';
   document.getElementById('actions').innerHTML = htmlActions;
   document.body.classList.toggle('avec-actions', htmlActions !== '');
+}
 
-  // Position de l'écran
+/** Position de l'écran : en haut, comme on l'avait laissé (retour), ou sur un élément précis. */
+function positionner(evenement, changement) {
   const cible = evenement?.detail?.cible;
   if (cible) {
     document.getElementById(cible)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  } else if (evenement?.type !== 'donnees-modifiees') {
+  } else if (changement?.restaurer) {
+    restaurerPositionCourante();
+  } else if (!['donnees-modifiees', 'adresse-remplacee'].includes(evenement?.type)) {
     window.scrollTo(0, 0);
   }
+}
+
+/**
+ * « evenement » dit pourquoi on affiche :
+ * - changement d'adresse : nouvel écran (en haut) ou retour (position retrouvée), avec transition ;
+ * - données modifiées : on garde la position, ou on amène un élément précis à l'écran.
+ * Les données sont lues AVANT la transition : l'animation n'attend jamais la base.
+ */
+async function afficherEcran(evenement) {
+  const numero = ++dernierAffichage;
+  let changement = null;
+  if (evenement?.type === 'hashchange') {
+    changement = noterChangementAdresse();
+    if (changement === null) return;   // déjà affiché par le geste de retour
+  }
+  await attendreFinGeste();
+  const adresse = location.hash;
+  const vue = await preparerVue(adresse);
+  if (numero !== dernierAffichage) return;   // un autre écran a été demandé entre-temps
+
+  await jouerTransition(changement?.type ?? null, () => {
+    fermerMenu({ toutDeSuite: true });
+    appliquerVue(vue, adresse);
+    noterTitre(vue.titre);
+    preparerBoutonRetour();
+    positionner(evenement, changement);
+  }, changement ?? {});
 }
 
 /* --------------------------------------------------------------------------
@@ -219,9 +273,11 @@ document.addEventListener('click', (evenement) => {
   if (action) lancer(action, bouton);
 });
 
-// Un lien du menu ferme le menu, même s'il mène à la page déjà ouverte.
+// Un lien du menu vers la page déjà ouverte ferme simplement le menu
+// (vers une autre page, le menu disparaît avec la transition).
 document.addEventListener('click', (evenement) => {
-  if (evenement.target.closest('.menu-lien')) fermerMenu();
+  const lien = evenement.target.closest('.menu-lien');
+  if (lien && lien.getAttribute('href') === location.hash) fermerMenu();
 });
 
 // Même principe pour les champs dont la valeur change. L'événement « change »
@@ -241,12 +297,22 @@ document.addEventListener('change', (evenement) => {
 // ou quand des données sont modifiées, on réaffiche l'écran.
 window.addEventListener('hashchange', afficherEcran);
 window.addEventListener('donnees-modifiees', afficherEcran);
+window.addEventListener('adresse-remplacee', afficherEcran);
 
 // Au lancement, l'app s'ouvre sur l'accueil. L'iPhone ouvre l'adresse enregistrée
 // à l'installation (« #/seance ») : on la remplace, sans créer d'étape « retour ».
 if (['', '#', '#/', '#/seance'].includes(location.hash)) {
   history.replaceState(null, '', '#/accueil');
 }
+
+// La pile des écrans (v19) et ce dont le geste de retour a besoin
+demarrerPile();
+configurerNavigation({
+  preparerVue,
+  appliquerVue,
+  allumerAdresse,
+  gesteAutorise: () => !location.hash.startsWith('#/vbt/'),   // pas pendant une mesure vidéo
+});
 
 // Premier affichage au lancement de l'app
 afficherEcran();
