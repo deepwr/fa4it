@@ -20,6 +20,21 @@
   <link rel="stylesheet" href="labo.css">
 </head>
 <body>
+  <!-- En haut : bouton ⌂ (retour à l'accueil) à gauche, menu ☰ à droite.
+       Ils restent visibles quand on fait défiler l'écran. Sur l'accueil, le logo remplace ⌂. -->
+  <div class="barre-navigation">
+    <a class="marque" id="marque" href="#/accueil" hidden>
+      <svg width="30" height="30" viewBox="0 0 1000 1000" aria-hidden="true"><polygon class="logo-saumon" points="20,696.5 340.7,696.5 716.3,320.9 716.3,0.2"/><polygon class="logo-bleu" points="716.3,432.8 980,432.8 980,696.5 716.3,696.5 716.3,999.8 452.6,999.8 452.6,696.5"/></svg>
+      <span>FA4IT</span>
+    </a>
+    <a class="bouton-rond" id="bouton-accueil" href="#/accueil" aria-label="Accueil">
+      <svg class="icone" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+    </a>
+    <button class="bouton-rond" id="bouton-menu" type="button" data-action="menu-ouvrir" aria-label="Menu" aria-expanded="false" aria-controls="menu">
+      <svg width="20" height="16" viewBox="0 0 20 16" aria-hidden="true"><path d="M1 2h18M1 8h18M1 14h18" fill="none" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
   <!-- En-tête : le grand titre de l'écran -->
   <header class="barre-haut">
     <h1 id="titre">FA 4 IT</h1>
@@ -28,16 +43,24 @@
   <!-- Le contenu de l'écran est inséré ici par js/app.js -->
   <main id="ecran" class="ecran"></main>
 
-  <!-- Les gros boutons d'action, au niveau du pouce, au-dessus des onglets -->
+  <!-- Les gros boutons d'action, en bas, au niveau du pouce -->
   <div id="actions" class="barre-actions"></div>
 
-  <!-- La barre d'onglets en bas de l'écran -->
-  <nav class="barre-onglets" aria-label="Navigation principale">
-    <a class="onglet" href="#/programme" data-onglet="programme">Programme</a>
-    <a class="onglet" href="#/seance" data-onglet="seance">Séance</a>
-    <a class="onglet" href="#/suivi" data-onglet="suivi">Suivi</a>
-    <a class="onglet" href="#/historique" data-onglet="historique">Historique</a>
-    <a class="onglet" href="#/sauvegarde" data-onglet="sauvegarde">Sauvegarde</a>
+  <!-- Le menu ☰ : la liste des pages (caché tant qu'on ne l'ouvre pas) -->
+  <div class="menu-fond" id="menu-fond" data-action="menu-fermer" hidden></div>
+  <nav class="menu" id="menu" aria-label="Menu" hidden>
+    <div class="menu-haut">
+      <button class="bouton-rond bouton-rond-plat" type="button" data-action="menu-fermer" aria-label="Fermer le menu">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2l12 12M14 2L2 14" fill="none" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <a class="menu-lien" href="#/accueil" data-page="accueil"><svg class="icone" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>Accueil</a>
+    <hr class="menu-separateur">
+    <a class="menu-lien" href="#/programme" data-page="programme"><svg class="icone" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Programme</a>
+    <a class="menu-lien" href="#/seance" data-page="seance"><svg class="icone" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M5 8v8M8 6v12M16 6v12M19 8v8"/></svg>Séance</a>
+    <a class="menu-lien" href="#/suivi" data-page="suivi"><svg class="icone" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/></svg>Suivi</a>
+    <a class="menu-lien" href="#/historique" data-page="historique"><svg class="icone" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Historique</a>
+    <a class="menu-lien" href="#/sauvegarde" data-page="sauvegarde"><svg class="icone" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Sauvegarde</a>
   </nav>
 
   <!-- Petit message temporaire (ex. « Enregistré ») -->

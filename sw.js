@@ -8,7 +8,7 @@
 //   2. si vous avez ajouté un fichier, ajoutez-le aussi dans FICHIERS.
 // C'est le changement de VERSION qui déclenche la mise à jour sur l'iPhone.
 
-const VERSION = 'v15';
+const VERSION = 'v16';
 const CACHE = `fa4it-${VERSION}`;
 
 // Tous les fichiers de l'app (chemins relatifs à ce fichier sw.js).
@@ -45,6 +45,7 @@ const FICHIERS = [
   'js/vbt-analyse.js',
   'js/labo-vbt.js',
   'js/vitesse.js',
+  'js/accueil.js',
 ];
 
 // Sur le Mac (Live Server), on va d'abord chercher les fichiers sur le réseau

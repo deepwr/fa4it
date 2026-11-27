@@ -8,7 +8,7 @@
 
 :root {
   /* --- Couleurs ---------------------------------------------------------- */
-  --bleu: #89CFF0;              /* bleu bébé : boutons principaux, onglet actif */
+  --bleu: #89CFF0;              /* bleu bébé : boutons principaux, tuile Séance */
   --bleu-presse: #6BBFE6;       /* bleu au moment où l'on appuie sur un bouton */
   --bleu-clair: #E3F4FC;        /* fond des boutons secondaires */
   --saumon: #FF91A4;            /* accents et contour des alertes */
@@ -18,7 +18,8 @@
   --texte: #2C2C2E;             /* texte principal, y compris sur les boutons */
   --texte-secondaire: #636366;  /* étiquettes, textes d'aide */
   --bordure: #D1D1D6;           /* contour des champs */
-  --fond-onglets: rgba(255, 255, 255, 0.92); /* barre du bas, légèrement translucide */
+  --voile-menu: rgba(28, 35, 49, 0.35); /* assombrit l'écran derrière le menu ☰ */
+  --blanc-voile: rgba(255, 255, 255, 0.55); /* pastille de l'icône sur la tuile Séance */
   --voile: rgba(0, 0, 0, 0.06); /* fines lignes de séparation */
 
   /* --- Arrondis ---------------------------------------------------------- */
@@ -40,13 +41,11 @@
   --zone-tactile: 44px;         /* taille minimale d'une zone à toucher (règle Apple) */
   --hauteur-bouton: 52px;
   --hauteur-champ: 50px;
-  --hauteur-onglets: 64px;
 
   /* --- Police ------------------------------------------------------------ */
   --police: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   --taille-texte: 17px;         /* au moins 16 px dans les champs, sinon l'iPhone zoome */
   --taille-petite: 15px;
-  --taille-onglet: 13px;        /* texte des 5 onglets du bas */
   --taille-sous-titre: 20px;
   --taille-titre: 32px;
 
@@ -78,6 +77,7 @@ html {
 }
 
 body {
+  display: flow-root;   /* la marge du haut de la barre ⌂ ☰ reste dans la page (pas de défilement en trop) */
   margin: 0;
   min-height: 100dvh;
   font-family: var(--police);
@@ -128,10 +128,24 @@ textarea {
 
 .barre-haut {
   padding:
-    calc(var(--zone-haut) + var(--espace-m))
+    var(--espace-s)
     calc(var(--espace-l) + var(--zone-droite))
     var(--espace-s)
     calc(var(--espace-l) + var(--zone-gauche));
+}
+
+/* Sur l'accueil, pas de grand titre visible (il reste lu par VoiceOver) */
+.page-accueil .barre-haut {
+  padding: 0;
+}
+
+.page-accueil .barre-haut h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .barre-haut h1 {
@@ -147,13 +161,13 @@ textarea {
   padding:
     var(--espace-s)
     calc(var(--espace-l) + var(--zone-droite))
-    calc(var(--hauteur-onglets) + var(--zone-bas) + var(--espace-xl))
+    calc(var(--zone-bas) + var(--espace-xl))
     calc(var(--espace-l) + var(--zone-gauche));
 }
 
 /* Quand il y a des boutons d'action en bas, on laisse plus de place */
 body.avec-actions .ecran {
-  padding-bottom: calc(var(--hauteur-onglets) + var(--zone-bas) + var(--hauteur-bouton) + var(--espace-xl) + var(--espace-m));
+  padding-bottom: calc(var(--zone-bas) + var(--hauteur-bouton) + var(--espace-xl) + var(--espace-m));
 }
 
 /* ==========================================================================
@@ -448,7 +462,7 @@ input.champ[type="date"]::-webkit-date-and-time-value {
   position: fixed;
   left: calc(var(--espace-l) + var(--zone-gauche));
   right: calc(var(--espace-l) + var(--zone-droite));
-  bottom: calc(var(--hauteur-onglets) + var(--zone-bas) + var(--espace-m));
+  bottom: calc(var(--zone-bas) + var(--espace-m));
   display: flex;
   gap: var(--espace-s);
   z-index: 15;
@@ -469,48 +483,263 @@ input.champ[type="date"]::-webkit-date-and-time-value {
 }
 
 /* ==========================================================================
-   Barre d'onglets
+   Navigation (v16) : bouton ⌂ et menu ☰ en haut, qui restent visibles
+   quand on fait défiler ; plus de barre d'onglets en bas
    ========================================================================== */
 
-.barre-onglets {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: grid;
-  grid-auto-flow: column;       /* autant de colonnes que d'onglets */
-  grid-auto-columns: 1fr;
-  gap: 4px;
-  height: calc(var(--hauteur-onglets) + var(--zone-bas));
-  padding:
-    var(--espace-s)
-    calc(var(--espace-s) + var(--zone-droite))
-    calc(var(--espace-s) + var(--zone-bas))
-    calc(var(--espace-s) + var(--zone-gauche));
-  background: var(--fond-onglets);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
-  border-top: 1px solid var(--voile);
-  z-index: 20;
-}
-
-.onglet {
+.barre-navigation {
+  position: sticky;
+  top: calc(var(--zone-haut) + var(--espace-s));
+  z-index: 25;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   min-height: var(--zone-tactile);
+  margin:
+    calc(var(--zone-haut) + var(--espace-s))
+    calc(var(--espace-m) + var(--zone-droite))
+    0
+    calc(var(--espace-m) + var(--zone-gauche));
+  pointer-events: none;           /* entre les deux boutons, on touche l'écran dessous */
+}
+
+.barre-navigation > * {
+  pointer-events: auto;
+}
+
+/* Le bouton ☰ reste à droite, même quand le bouton de gauche est caché */
+#bouton-menu {
+  margin-left: auto;
+}
+
+/* Petit bouton rond (⌂, ☰, ✕) */
+.bouton-rond {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zone-tactile);
+  height: var(--zone-tactile);
+  padding: 0;
+  border: none;
   border-radius: var(--arrondi-pilule);
-  color: var(--texte-secondaire);
-  font-size: var(--taille-onglet);
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
+  background: var(--carte);
+  color: var(--texte);
+  stroke: var(--texte);
+  box-shadow: var(--ombre-bouton);
+  cursor: pointer;
   touch-action: manipulation;
 }
 
-.onglet.actif {
-  background: var(--bleu);
+.bouton-rond:active {
+  background: var(--bleu-clair);
+}
+
+.bouton-rond-plat {
+  box-shadow: none;
+}
+
+/* Logo + « FA4IT » sur l'accueil, à la place du bouton ⌂ */
+.marque {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--zone-tactile);
   color: var(--texte);
+  font-size: 22px;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.logo-saumon {
+  fill: var(--saumon);
+}
+
+.logo-bleu {
+  fill: var(--bleu);
+}
+
+/* Le menu : un panneau en haut à droite, l'écran assombri derrière */
+.menu-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--voile-menu);
+}
+
+.menu {
+  position: fixed;
+  top: calc(var(--zone-haut) + var(--espace-s));
+  right: calc(var(--espace-m) + var(--zone-droite));
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  width: min(280px, calc(100% - 2 * var(--espace-m)));
+  max-height: calc(100dvh - var(--zone-haut) - var(--zone-bas) - 2 * var(--espace-s));
+  overflow-y: auto;
+  padding: var(--espace-s);
+  border-radius: var(--arrondi-carte);
+  background: var(--carte);
+  box-shadow: var(--ombre-forte);
+}
+
+.menu[hidden],
+.menu-fond[hidden] {
+  display: none;
+}
+
+.menu-haut {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.menu-lien {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: var(--arrondi-champ);
+  color: var(--texte);
+  font-size: var(--taille-texte);
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.menu-lien .icone {
+  flex: none;
+  stroke: var(--bleu-presse);
+}
+
+.menu-lien:active {
+  background: var(--fond);
+}
+
+.menu-lien[aria-current="page"] {
+  background: var(--bleu-clair);
+  font-weight: 700;
+}
+
+.menu-lien[aria-current="page"] .icone {
+  stroke: var(--texte);
+}
+
+.menu-separateur {
+  height: 1px;
+  margin: 4px 14px;
+  border: none;
+  background: var(--voile);
+}
+
+/* ==========================================================================
+   Accueil (v16, voir js/accueil.js) : verset du jour et tuiles
+   ========================================================================== */
+
+.verset {
+  gap: var(--espace-s);
+  margin: 0;
+}
+
+.verset-guillemets {
+  fill: var(--saumon);
+}
+
+.verset-texte {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tuiles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tuiles-grille {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tuile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 116px;
+  padding: var(--espace-m);
+  border-radius: var(--arrondi-carte);
+  background: var(--carte);
+  box-shadow: var(--ombre-legere);
+  color: var(--texte);
+  text-decoration: none;
+  touch-action: manipulation;
+  transition: transform 0.1s ease;
+}
+
+.tuile:active {
+  transform: scale(0.98);
+}
+
+.tuile .icone {
+  stroke: var(--bleu-presse);
+}
+
+.tuile-texte {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tuile-titre {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.tuile-detail {
+  color: var(--texte-secondaire);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* La tuile Séance : pleine largeur, en bleu */
+.tuile-seance {
+  flex-direction: row;
+  align-items: center;
+  min-height: 104px;
+  padding: var(--espace-m) 18px;
+  background: var(--bleu);
+  box-shadow: none;
+}
+
+.tuile-seance .tuile-titre {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.tuile-seance .tuile-detail {
+  color: var(--texte);
+  font-size: 14px;
+}
+
+.tuile-pastille {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--arrondi-pilule);
+  background: var(--blanc-voile);
+}
+
+.tuile-seance .icone {
+  stroke: var(--texte);
 }
 
 /* ==========================================================================
