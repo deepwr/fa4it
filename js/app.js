@@ -11,6 +11,7 @@ import { ecransSeance, boutonsSeance, changementsSeance } from './seance.js';
 import { ecransSuivi, boutonsSuivi } from './suivi.js';
 import { ecransLabo, boutonsLabo, changementsLabo } from './labo-vbt.js';
 import { ecransHistorique, changementsHistorique } from './historique.js';
+import { ecransVitesse, boutonsVitesse, changementsVitesse } from './vitesse.js';
 import { ecranSauvegarde, boutonsSauvegarde, changementsSauvegarde } from './sauvegarde.js';
 
 /* --------------------------------------------------------------------------
@@ -28,6 +29,7 @@ const ecrans = {
   ...ecransSuivi,           // suivi (voir suivi.js)
   ...ecransHistorique,      // historique (voir historique.js)
   ...ecransLabo,            // labo VBT, ouvert depuis Sauvegarde (voir labo-vbt.js)
+  ...ecransVitesse,         // détail d'une série et vitesse à charge égale (voir vitesse.js)
 
   sauvegarde: {
     onglet: 'sauvegarde',
@@ -123,6 +125,7 @@ const actionsBoutons = {
   ...boutonsSeance,
   ...boutonsSuivi,
   ...boutonsLabo,
+  ...boutonsVitesse,
   ...boutonsSauvegarde,
 };
 
@@ -131,6 +134,7 @@ const actionsChangements = {
   ...changementsSeance,
   ...changementsHistorique,
   ...changementsLabo,
+  ...changementsVitesse,
   ...changementsSauvegarde,
 };
 

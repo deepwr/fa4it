@@ -5,11 +5,13 @@
 //   - courbe saumon : l'e1RM projeté à partir de ce même lift (table RPE).
 // Filtre de période : 6 mois, 1 an ou tout. Toucher un point affiche son détail.
 // Le graphique est dessiné par l'app elle-même (SVG) : il marche hors ligne.
+// En bas : la carte « Vitesse à charge égale » (voir vitesse.js).
 
 import { lireBlocs, lireReglage, ecrireReglage } from './db.js';
 import { compteDansE1rm, evaluerSerie, formaterE1rm } from './e1rm.js';
 import { MOUVEMENTS, aujourdhui } from './modele.js';
 import { echapper, carteVide, formaterNombre, formaterDate, pluriel } from './ui.js';
+import { carteVitesseSuivi } from './vitesse.js';
 
 const ORDRE_MOUVEMENTS = ['squat', 'bench', 'deadlift'];
 
@@ -326,6 +328,7 @@ async function ecranSuivi() {
       </p>
       ${cartes}
       <p class="texte-secondaire">Un point par bloc. Seuls comptent le Squat, le Bench et le Deadlift en format compétition, comme pour l’e1RM. Touchez un point pour voir son détail.</p>
+      ${carteVitesseSuivi(blocs)}
     `,
   };
 }

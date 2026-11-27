@@ -19,6 +19,7 @@ import {
 import { calculerE1rm, seriesDuJour, htmlResultats, compteDansE1rm } from './e1rm.js';
 import { proposerRampUp } from './echauffement.js';
 import { proposerEnvoiApresSeance } from './sheets.js';
+import { indexDesVitesses, ligneVitesseSeance, aUneVideo } from './vitesse.js';
 
 /* ==========================================================================
    1. Règles de saisie
@@ -117,32 +118,21 @@ function alertesSerie(serie, prescription, liste = 'series') {
   return messages;
 }
 
-/** Vitesse en m/s, toujours avec 2 décimales : 0,5 → « 0,50 ». */
-function formaterVitesse(valeur) {
-  return valeur.toFixed(2).replace('.', ',');
-}
-
 /**
- * Squat, Bench, Deadlift (variantes comprises) : bouton « Mesurer en vidéo » et,
- * si la série a déjà été mesurée, le résumé de la mesure.
+ * Mesure vidéo d'une ligne :
+ * - pas encore filmée : bouton « Mesurer en vidéo » (Squat, Bench, Deadlift et variantes) ;
+ * - filmée, ou vitesse comparable à charge égale : UNE ligne qui ouvre le détail de la série
+ *   (barres des reps, perte de vitesse, comparaison, « Remesurer en vidéo ») — voir vitesse.js.
  */
-function zoneVideo(ids, exercice, serie, index, liste = 'series') {
-  if (exercice.mouvement === 'autre') return '';
+function zoneVideo(ids, exercice, serie, index, liste = 'series', vitesses = null) {
+  const lien = vitesses ? ligneVitesseSeance(vitesses, ids, liste, index, serie) : '';
+  if (exercice.mouvement === 'autre' || aUneVideo(serie)) return lien;
   const adresse = `#/vbt/${ids.bloc}/${ids.semaine}/${ids.jour}/${ids.exercice}/${liste}/${index}`;
-  const mesure = serie.vbt;
-  let resume = '';
-  if (mesure && mesure.reps.length > 0) {
-    const vitesses = mesure.reps.map((rep) => rep.vitesse);
-    const plage = vitesses.length > 1
-      ? `de ${formaterVitesse(Math.min(...vitesses))} à ${formaterVitesse(Math.max(...vitesses))} m/s`
-      : `${formaterVitesse(vitesses[0])} m/s`;
-    resume = `<span class="texte-secondaire">Vidéo : ${pluriel(mesure.reps.length, 'rep')}, ${plage}</span>`;
-  }
   return `
     <div class="serie-vbt">
-      <a class="bouton bouton-secondaire bouton-petit" href="${echapper(adresse)}">${mesure ? 'Remesurer en vidéo' : 'Mesurer en vidéo'}</a>
-      ${resume}
+      <a class="bouton bouton-secondaire bouton-petit" href="${echapper(adresse)}">Mesurer en vidéo</a>
     </div>
+    ${lien}
   `;
 }
 
@@ -288,7 +278,7 @@ function champSimple({ ids, index, liste = 'series', champ, etiquette, valeur, i
   `;
 }
 
-function ligneSerie(ids, exercice, serie, index) {
+function ligneSerie(ids, exercice, serie, index, vitesses) {
   const prescription = exercice.prescription;
   const alertes = alertesSerie(serie, prescription);
   const chargeEnAlerte = alertes.some((m) => m.startsWith('Charge'));
@@ -305,7 +295,7 @@ function ligneSerie(ids, exercice, serie, index) {
         ${champPasAPas({ ids, index, champ: 'rpe', etiquette: 'RPE', valeur: serie.rpe, depart: prescription.rpeCible ?? 8, enAlerte: rpeEnAlerte })}
         ${champSimple({ ids, index, champ: 'vitesse', etiquette: 'Vitesse moy. (m/s)', valeur: serie.vitesse, indice: 'm/s' })}
       </div>
-      ${zoneVideo(ids, exercice, serie, index)}
+      ${zoneVideo(ids, exercice, serie, index, 'series', vitesses)}
       <p class="alerte serie-alerte" role="status"${alertes.length > 0 ? '' : ' hidden'}>${alertes.length > 0 ? `⚠︎ ${alertes.join(' · ')}` : ''}</p>
     </div>
   `;
@@ -316,7 +306,7 @@ function ligneSerie(ids, exercice, serie, index) {
  * Paliers intermédiaires : une seule ligne compacte (charge × répétitions, case faite).
  * Last warm-up : carte complète avec RPE et vitesse moyenne.
  */
-function ligneEchauffement(ids, exercice, serie, index, total) {
+function ligneEchauffement(ids, exercice, serie, index, total, vitesses) {
   const liste = 'echauffement';
   const attributs = attributsSerie(ids, index, liste);
   const idHtml = echapper(idLigne(exercice.id, index, liste));
@@ -346,7 +336,7 @@ function ligneEchauffement(ids, exercice, serie, index, total) {
         ${champPasAPas({ ids, index, liste, champ: 'rpe', etiquette: 'RPE', valeur: serie.rpe, depart: 6 })}
         ${champSimple({ ids, index, liste, champ: 'vitesse', etiquette: 'Vitesse moy. (m/s)', valeur: serie.vitesse, indice: 'm/s' })}
       </div>
-      ${zoneVideo(ids, exercice, serie, index, liste)}
+      ${zoneVideo(ids, exercice, serie, index, liste, vitesses)}
       <p class="alerte serie-alerte" role="status"${alertes.length > 0 ? '' : ' hidden'}>${alertes.length > 0 ? `⚠︎ ${alertes.join(' · ')}` : ''}</p>
     </div>
   `;
@@ -362,7 +352,7 @@ function resumeEchauffement(lignes) {
  * Partie « Échauffement » d'un exercice (Squat, Bench ou Deadlift, variantes comprises).
  * Sans échauffement : un bouton pour proposer un ramp-up. Ouverte tant qu'un palier reste à faire.
  */
-function sectionEchauffement(ids, exercice) {
+function sectionEchauffement(ids, exercice, vitesses) {
   if (exercice.mouvement === 'autre') return '';
   const lignes = exercice.echauffement ?? [];
   const attributs = attributsSerie(ids, lignes.length, 'echauffement');
@@ -379,7 +369,7 @@ function sectionEchauffement(ids, exercice) {
     <details class="echauffement" id="echauffement-${echapper(exercice.id)}"${ouvert ? ' open' : ''}>
       <summary>Échauffement · <span id="resume-echauffement-${echapper(exercice.id)}">${resumeEchauffement(lignes)}</span></summary>
       ${lignes.length > 1 ? '<p class="palier-legende" aria-hidden="true"><span>Palier</span><span>Charge (kg)</span><span></span><span>Rép.</span><span>Fait</span></p>' : ''}
-      ${lignes.map((serie, index) => ligneEchauffement(ids, exercice, serie, index, lignes.length)).join('')}
+      ${lignes.map((serie, index) => ligneEchauffement(ids, exercice, serie, index, lignes.length, vitesses)).join('')}
       <div class="rangee">
         <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="ajouter-serie" ${attributs}>+ Palier</button>
         <button class="bouton bouton-alerte bouton-petit" type="button" data-action="retirer-serie" ${attributsSerie(ids, lignes.length - 1, 'echauffement')}>Retirer le dernier</button>
@@ -388,9 +378,9 @@ function sectionEchauffement(ids, exercice) {
   `;
 }
 
-function carteExerciceSeance(idsJour, exercice) {
+function carteExerciceSeance(idsJour, exercice, vitesses) {
   const ids = { ...idsJour, exercice: exercice.id };
-  const lignes = exercice.series.map((serie, index) => ligneSerie(ids, exercice, serie, index)).join('');
+  const lignes = exercice.series.map((serie, index) => ligneSerie(ids, exercice, serie, index, vitesses)).join('');
   const competition = compteDansE1rm(exercice) ? ' · format compétition' : '';
   return `
     <section class="carte" id="exercice-${echapper(exercice.id)}">
@@ -399,7 +389,7 @@ function carteExerciceSeance(idsJour, exercice) {
         <p class="texte-secondaire">${MOUVEMENTS[exercice.mouvement] ?? 'Autre'}${competition} · ${resumePrescription(exercice.prescription)}</p>
         ${exercice.consignes ? `<p class="consignes">${echapper(exercice.consignes)}</p>` : ''}
       </div>
-      ${sectionEchauffement(ids, exercice)}
+      ${sectionEchauffement(ids, exercice, vitesses)}
       ${lignes || '<p class="texte-secondaire">Aucune série prévue.</p>'}
       <div class="rangee">
         <button class="bouton bouton-secondaire bouton-petit" type="button" data-action="ajouter-serie" ${attributsSerie(ids, exercice.series.length)}>+ Série</button>
@@ -427,9 +417,11 @@ async function ecranSaisie([idBloc, idSemaine, idJour]) {
 
   const ids = { bloc: bloc.id, semaine: semaine.id, jour: jour.id };
   const { faites, total } = avancement(jour);
+  // Toutes les vitesses de tous les blocs : pour comparer chaque série à charge égale
+  const vitesses = indexDesVitesses(await lireBlocs());
   const prevu = jour.datePrevue ? ` · prévu le ${formaterDate(jour.datePrevue)}` : '';
   const exercices = jour.exercices.length > 0
-    ? jour.exercices.map((exercice) => carteExerciceSeance(ids, exercice)).join('')
+    ? jour.exercices.map((exercice) => carteExerciceSeance(ids, exercice, vitesses)).join('')
     : carteVide('Aucun exercice', 'Ajoutez des exercices à ce jour dans l’onglet Programme.');
 
   return {
